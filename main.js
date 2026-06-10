@@ -175,6 +175,15 @@ function rebuildWalls() {
 rebuildWalls();
 window.addEventListener('resize', rebuildWalls);
 
+// The stage can resize without a window resize — e.g. on phones the tool
+// drawer grows when the toolbar populates, shrinking the stage after boot.
+// Watch the stage element itself so the floor always sits at its bottom.
+if (typeof ResizeObserver !== 'undefined') {
+  new ResizeObserver(() => {
+    if (stage.clientWidth !== W || stage.clientHeight !== H) rebuildWalls();
+  }).observe(stage);
+}
+
 // Mouse drag
 const mouse = Mouse.create(render.canvas);
 const mouseConstraint = MouseConstraint.create(engine, {
