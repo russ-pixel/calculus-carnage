@@ -2,7 +2,7 @@
 
 **▶ Play it now: https://russ-pixel.github.io/calculus-carnage/** (works on phones — add to home screen for the app experience)
 
-Browser physics-sandbox where every unlock is gated behind an algebra problem. Adult tone, no condescension, 3-tier hint system. Plain HTML + JS + Matter.js, **no build step, no dependencies**. Three worlds: **Surface**, **The Abyss** (underwater, gated behind Level 4), and **Mars** (0.38g, gated behind Level 5).
+Browser physics-sandbox where every unlock is gated behind an algebra problem. Adult tone, no condescension, 3-tier hint system. Plain HTML + JS + Matter.js, **no build step, no dependencies**. Four worlds: **Surface**, **The Abyss** (underwater, gated behind Level 4), **Mars** (0.38g, gated behind Level 5), and **The Yard** (bug-scale lawn at dusk, gated behind Level 6).
 
 ## Run
 
@@ -81,10 +81,28 @@ The world itself is gated behind a **Level 4** problem (`ax + b = cx + d`, Grade
 | Whirlpool | 4 | action | 5.2s mid-water vortex, pulls bodies into orbit, drifts. |
 | Kraken | 4 | action | Three tentacles rise from the seafloor for 7.5s; each drags nearby bodies to its tip and periodically slams them down (sets velocity y=26 → floor-impact gore). Pure force-field + procedural render, no physics bodies. |
 
+## Tools — The Yard
+
+The world is gated behind a **Level 6** problem (`a(x + b) = cx + d`, distribute-then-collect, Grade 8). You're shrunk to bug scale on a front lawn at dusk: towering grass, pollen, fireflies — and suburbia's entire food chain.
+
+| Tool | Level | Kind | Notes |
+|---|---|---|---|
+| Ladybug | 0 | spawn | Default unlocked. The Yard's victim — chamfered shell, spots, wiggling antennae. `kind: 'human'`, `isBug: true`, so every existing predator hunts it. Opts out of the humanoid posture controller (see architecture notes — this matters). |
+| Dog Poop | 2 | spawn | Sticky mound. Bodies near it bog down; flesh that touches it picks up orbiting flies for a few seconds. Mowing it is a mistake everyone makes once. |
+| Ant Column | 3 | spawn | Six workers, piranha-pattern: march at the nearest victim, bite the closest limb (2.5 dmg), dart back, repeat. |
+| Garden Spider | 3 | spawn | Stalks. At range it shoots a web — 2.4s paralysis + silk-wrap render — then closes in to bite (4 dmg). |
+| Sprinkler | 3 | action | Pops up mid-lawn for 6.5s; an oscillating high-pressure jet flings ragdolls and sprays droplets. |
+| Cordyceps Spore | 4 | spawn | Drifts to the nearest victim's head and takes root. The host staggers as the stalk grows, dies at ~4s ("Consumed from the head down."), fungifies limb by limb, and at ~9s the cap bursts — releasing two fresh spores that seek new hosts. Self-sustaining if you let it. |
+| Magnifying Glass | 4 | action | A focused sunbeam wanders to the nearest creature and lingers; ~0.7s of focus ignites it. |
+| Fire Lizard | 5 | spawn | The villain. At bug scale a backyard lizard is a kaiju: tanky (`maxDamage: 140`, the per-dummy dismember threshold added for it), stalks at capped speed, breathes 1.4s cones of fire inside 200px. Fire-immune, including to its own breath. |
+| Lawnmower | 6 | action | The apex. Rolls across the floor; anything flesh at blade height is shredded instantly (sets damage past any `maxDamage` — yes, it beats the lizard). Sprays grass clippings, mulches poop. |
+
+Shared **burning system** (`igniteDummy(d, ms)`): burning creatures take 3 dmg per 420ms, char toward black, smoke, and shed flame particles that ignite anything flammable they touch — fire spreads on contact.
+
 ## Files
 
 - `index.html` — UI shell, CSS, math-gate modal, HUD, world tabs, toolbar, sidebar log. PWA meta tags + responsive phone layout (stage on top, tool drawer below, 🛠 toggle for fullscreen play).
-- `main.js` — all game logic (~3200 lines). Single source of truth. World 2 lives in the `WORLD 2: THE ABYSS` section at the bottom; world definitions (`WORLDS`, `ABYSS_GATE`) sit next to `TOOLS` at the top.
+- `main.js` — all game logic (~4900 lines). Single source of truth. Worlds 2–4 live in `WORLD 2: THE ABYSS` / `WORLD 3: MARS` / `WORLD 4: THE YARD` sections near the bottom; world definitions (`WORLDS` + the `*_GATE` pseudo-tools) sit next to `TOOLS` at the top.
 - `matter.min.js` — vendored Matter.js 0.20.0 (local so the PWA works offline).
 - `manifest.webmanifest`, `sw.js`, `icon-*.png`, `apple-touch-icon.png` — PWA install + offline support. **Bump `CACHE` in sw.js when shipping changes**, or installed copies keep serving old files (cache-first). The install step fetches with `cache: 'reload'` to bypass stale HTTP caches.
 
@@ -109,7 +127,8 @@ Each entry: `{ kind, parts, constraints, joints, limbs, damage, partDamage, legs
 - `beforeUpdate` applies restoring torque to torso + legs when `standing && backOk`.
 - Back damage >18 → `breakBack()` → `standing=false`, ragdolls from the waist.
 - Leg damage >14 on a side → `breakLeg()` pops that hip, sets `standing=false`.
-- Total damage >45 → `dismember()` removes all constraints + triggers slow-mo kill cam.
+- Total damage > `maxDamage || 45` → `dismember()` removes all constraints + triggers slow-mo kill cam. Set `maxDamage` on the dummy entry for tanky creatures (the fire lizard uses 140).
+- **⚠ Posture stability**: `uprightTorque` scales torque by *mass*, but stability depends on *inertia*. Small compact limbs (stubby legs, small heads) have a high mass/inertia ratio and the controller diverges — angular velocity explodes exponentially and the culler silently "kills" the creature off-screen. If your creature's limbs are smaller than the standard dummy's 14×50 legs, opt out: `standing: false` (own posture handler, like the ladybug) or `legsOk: {L: false, R: false}` with paired "welded" hip constraints (like the fire lizard). Don't try to fix it with `Body.setInertia` — we tried; the margin is too thin.
 - `dismember` is monkey-patched at the bottom of `main.js` to also burst parasites if the host was a monster — `_origDismember` keeps the original.
 
 ### Force tuning that worked
@@ -119,6 +138,8 @@ Each entry: `{ kind, parts, constraints, joints, limbs, damage, partDamage, legs
 - Duck waddle: `0.008`, lunge: `0.04`
 - Monster walk: `0.018`, lunge: `0.09`
 - Parasite seek: `0.0009` (plus tiny upward lift to fight gravity)
+- Lizard stalk: `0.009`, **speed-capped** at |vx| < 4.5 — an uncapped charge hits light creatures hard enough to blow up their constraint solver
+- Never spawn a body embedded in the 240px walls (e.g. "off-screen" entrances): overlap resolution catapults it across the stage. The mower spawns flush with the stage edge instead.
 
 Walls were thickened from 60px → 240px to stop high-speed bodies (bullets, lunges) from tunneling through. An `afterUpdate` culler also removes anything that strays >400px outside the canvas — defensive safety net.
 
@@ -132,7 +153,7 @@ Walls were thickened from 60px → 240px to stop high-speed bodies (bullets, lun
 
 ### Math gate
 
-`makeProblem(level)` → `{ text, answer, level, method }`. Tier-3 hint *replaces* the current problem with a fresh structurally-identical one (so the player applies the method instead of copying the answer). Levels: 1 = `x ± a = b`, 2 = `ax = b` / `x÷a = b`, 3 = `ax + b = c`, 4 = `ax + b = cx + d`, 5 = `a(x + b) = c`.
+`makeProblem(level)` → `{ text, answer, level, method }`. Tier-3 hint *replaces* the current problem with a fresh structurally-identical one (so the player applies the method instead of copying the answer). Levels: 1 = `x ± a = b`, 2 = `ax = b` / `x÷a = b`, 3 = `ax + b = c`, 4 = `ax + b = cx + d`, 5 = `a(x + b) = c`, 6 = `a(x + b) = cx + d`.
 
 ### Visual flourishes
 
@@ -149,7 +170,8 @@ Wings, eyes, tentacles, blood, fire, etc. are drawn procedurally in `afterRender
 - Custom-execution / fatality builder.
 - Tier-based content scaling per the original design doc.
 - ~~World 3? (Space — zero-g, meteors, alien abduction beam…)~~ Shipped: Mars.
-- World 4? (Volcano — lava floor, fire imps, eruptions…)
+- ~~World 4?~~ Shipped: The Yard (bug-scale lawn — ladybug, cordyceps, fire lizard, lawnmower).
+- World 5? (Volcano — lava floor, fire imps, eruptions… the burning system from The Yard is reusable.)
 - Sound effects.
 
 ## License

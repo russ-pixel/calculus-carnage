@@ -9,8 +9,8 @@ const state = {
   solved: 0,
   skips: 0,
   correctStreak: 0,
-  levelCorrect: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
-  unlocked: new Set(['spawn-box', 'spawn-dummy', 'spawn-diver', 'spawn-astro']), // default tools
+  levelCorrect: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 },
+  unlocked: new Set(['spawn-box', 'spawn-dummy', 'spawn-diver', 'spawn-astro', 'spawn-bug']), // default tools
   pendingUnlock: null,                  // tool id awaiting math gate
   currentProblem: null,
   hintTier: 0,
@@ -53,16 +53,28 @@ const TOOLS = [
   { id: 'meteor-shower', label: 'Meteor Shower', level: 3, kind: 'action', action: 'meteors', world: 'mars' },
   { id: 'dust-storm',    label: 'Dust Storm',    level: 4, kind: 'action', action: 'storm',  world: 'mars' },
   { id: 'ufo',           label: 'UFO Abduction', level: 5, kind: 'action', action: 'ufo',    world: 'mars' },
+  // --- The Yard ---
+  { id: 'spawn-bug',     label: 'Ladybug',        level: 0, kind: 'spawn',  spawn: 'bug',       world: 'yard' },
+  { id: 'spawn-poop',    label: 'Dog Poop',       level: 2, kind: 'spawn',  spawn: 'poop',      world: 'yard' },
+  { id: 'spawn-ants',    label: 'Ant Column',     level: 3, kind: 'spawn',  spawn: 'ants',      world: 'yard' },
+  { id: 'spawn-spider',  label: 'Garden Spider',  level: 3, kind: 'spawn',  spawn: 'spider',    world: 'yard' },
+  { id: 'sprinkler',     label: 'Sprinkler',      level: 3, kind: 'action', action: 'sprinkler', world: 'yard' },
+  { id: 'spawn-spore',   label: 'Cordyceps Spore', level: 4, kind: 'spawn', spawn: 'spore',     world: 'yard' },
+  { id: 'magnify',       label: 'Magnifying Glass', level: 4, kind: 'action', action: 'magnify', world: 'yard' },
+  { id: 'spawn-lizard',  label: 'Fire Lizard',    level: 5, kind: 'spawn',  spawn: 'lizard',    world: 'yard' },
+  { id: 'mower',         label: 'Lawnmower',      level: 6, kind: 'action', action: 'mower',    world: 'yard' },
 ];
 
 // Worlds. Each world filters the toolbar and restyles the stage. Locked
 // worlds are math-gated — their tab behaves like a locked tool until solved.
 const ABYSS_GATE = { id: 'world-abyss', label: 'The Abyss', level: 4, onUnlock: () => switchWorld('abyss') };
 const MARS_GATE  = { id: 'world-mars',  label: 'Mars',      level: 5, onUnlock: () => switchWorld('mars') };
+const YARD_GATE  = { id: 'world-yard',  label: 'The Yard',  level: 6, onUnlock: () => switchWorld('yard') };
 const WORLDS = [
   { id: 'surface', label: 'Surface',   bg: '#0a0c10', wall: '#1a1f26', gravity: 1 },
   { id: 'abyss',   label: 'The Abyss', bg: '#03111d', wall: '#0c2231', gravity: 1, gate: ABYSS_GATE },
   { id: 'mars',    label: 'Mars',      bg: '#1c0d07', wall: '#4a2418', gravity: 0.38, gate: MARS_GATE },
+  { id: 'yard',    label: 'The Yard',  bg: '#0c1506', wall: '#28380f', gravity: 1, gate: YARD_GATE },
 ];
 
 // ---------- Problem generator ----------
@@ -140,19 +152,40 @@ function makeProblem(level) {
         `Step 2 — subtract ${b}: ${kx} = ${d - b}.` + lastStep,
     };
   }
-  // Level 5: a(x + b) = c — distributive property (whole-number solution)
-  const x = randInt(2, 10);
-  const a = randInt(2, 6);
-  const b = randInt(1, 9);
-  const c = a * (x + b);
+  if (level === 5) {
+    // Level 5: a(x + b) = c — distributive property (whole-number solution)
+    const x = randInt(2, 10);
+    const a = randInt(2, 6);
+    const b = randInt(1, 9);
+    const c = a * (x + b);
+    return {
+      text: `${a}(x + ${b}) = ${c}`,
+      answer: x,
+      level: 5,
+      method:
+        `Step 1 — divide both sides by ${a}: x + ${b} = ${c / a}. ` +
+        `Step 2 — subtract ${b}: x = ${x}. ` +
+        `(Or distribute first: ${a}x + ${a * b} = ${c}, then solve as a two-step.)`,
+    };
+  }
+  // Level 6: a(x + b) = cx + d — distribute, then variables on both sides
+  const x = randInt(2, 9);
+  const a = randInt(2, 5);
+  const c = randInt(1, a - 1);
+  const b = randInt(1, 8);
+  const d = (a - c) * x + a * b;
+  const k = a - c;
+  const kx = k === 1 ? 'x' : `${k}x`;
+  const cx = c === 1 ? 'x' : `${c}x`;
+  const lastStep = k === 1 ? '' : ` Step 4 — divide by ${k}: x = ${x}.`;
   return {
-    text: `${a}(x + ${b}) = ${c}`,
+    text: `${a}(x + ${b}) = ${cx} + ${d}`,
     answer: x,
-    level: 5,
+    level: 6,
     method:
-      `Step 1 — divide both sides by ${a}: x + ${b} = ${c / a}. ` +
-      `Step 2 — subtract ${b}: x = ${x}. ` +
-      `(Or distribute first: ${a}x + ${a * b} = ${c}, then solve as a two-step.)`,
+      `Step 1 — distribute: ${a}x + ${a * b} = ${cx} + ${d}. ` +
+      `Step 2 — subtract ${cx} from both sides: ${kx} + ${a * b} = ${d}. ` +
+      `Step 3 — subtract ${a * b}: ${kx} = ${d - a * b}.` + lastStep,
   };
 }
 
@@ -422,7 +455,7 @@ Events.on(engine, 'beforeUpdate', () => {
         spurt(tgt.limbs.torso.position.x, tgt.limbs.torso.position.y, 5, 0, -1);
         addDecal(tgt.limbs.torso.position.x, tgt.limbs.torso.position.y, 3);
         if (tgt.partDamage.back > 18 && tgt.backOk) breakBack(tgt);
-        if (tgt.damage > 45) dismember(tgt);
+        if (tgt.damage > (tgt.maxDamage || 45)) dismember(tgt);
       } else {
         shark.laserBeamUntil = 0;
       }
@@ -838,7 +871,7 @@ Events.on(engine, 'collisionStart', (e) => {
       if (part === 'legR' && dummy.partDamage.legR > 14) breakLeg(dummy, 'R');
       if (part === 'back' && dummy.partDamage.back > 18) breakBack(dummy);
 
-      if (dummy.damage > 45) dismember(dummy);
+      if (dummy.damage > (dummy.maxDamage || 45)) dismember(dummy);
     }
   }
 });
@@ -1378,6 +1411,12 @@ function placeAt(x, y) {
     case 'astro':    spawnAstro(x, y); break;
     case 'alien':    spawnAlien(x, y); break;
     case 'tank':     body = spawnTank(x, y); break;
+    case 'bug':      spawnBug(x, y); break;
+    case 'poop':     body = spawnPoop(x, y); break;
+    case 'ants':     spawnAnts(x, y); break;
+    case 'spider':   spawnSpider(x, y); break;
+    case 'spore':    spawnSpore(x, y); break;
+    case 'lizard':   spawnLizard(x, y); break;
   }
   if (body) World.add(engine.world, body);
 }
@@ -1433,6 +1472,9 @@ function onToolClick(t) {
     if (t.action === 'meteors') meteorShower();
     if (t.action === 'storm') spawnDustStorm();
     if (t.action === 'ufo') summonUFO();
+    if (t.action === 'sprinkler') startSprinkler();
+    if (t.action === 'magnify') startMagnify();
+    if (t.action === 'mower') launchMower();
     log(`Action: ${t.label}`);
     return;
   }
@@ -1605,6 +1647,8 @@ const lcount2El = document.getElementById('lcount2');
 const lcount3El = document.getElementById('lcount3');
 const lcount4El = document.getElementById('lcount4');
 const lcount5El = document.getElementById('lcount5');
+const lbar6El = document.getElementById('lbar6');
+const lcount6El = document.getElementById('lcount6');
 
 const GRADE_DATA = {
   1: { grade: 'Grade 6', topic: 'One-Step Equations (+/−)', standard: 'AL CCRS 6.EE.B.7' },
@@ -1612,6 +1656,7 @@ const GRADE_DATA = {
   3: { grade: 'Grade 7', topic: 'Two-Step Equations',        standard: 'AL CCRS 7.EE.B.4' },
   4: { grade: 'Grade 8', topic: 'Variables on Both Sides',   standard: 'AL CCRS 8.EE.C.7' },
   5: { grade: 'Grade 8', topic: 'Distributive Equations',    standard: 'AL CCRS 8.EE.C.7b' },
+  6: { grade: 'Grade 8', topic: 'Multi-Step: Distribute + Collect', standard: 'AL CCRS 8.EE.C.7b' },
 };
 const PROFICIENCY_AT = 3; // correct answers to establish proficiency at a level
 
@@ -1623,14 +1668,16 @@ function refreshProficiency() {
   lbar3El.style.width = pct(3) + '%';
   lbar4El.style.width = pct(4) + '%';
   lbar5El.style.width = pct(5) + '%';
+  lbar6El.style.width = pct(6) + '%';
   lcount1El.textContent = lc[1];
   lcount2El.textContent = lc[2];
   lcount3El.textContent = lc[3];
   lcount4El.textContent = lc[4];
   lcount5El.textContent = lc[5];
+  lcount6El.textContent = lc[6];
 
   let highestProficient = 0;
-  for (let lvl = 5; lvl >= 1; lvl--) {
+  for (let lvl = 6; lvl >= 1; lvl--) {
     if (lc[lvl] >= PROFICIENCY_AT) { highestProficient = lvl; break; }
   }
 
@@ -1639,7 +1686,7 @@ function refreshProficiency() {
     gradeEl.textContent = `${grade} · ${topic}`;
     standardEl.textContent = standard;
   } else {
-    const active = lc[5] > 0 ? 5 : lc[4] > 0 ? 4 : lc[3] > 0 ? 3 : lc[2] > 0 ? 2 : lc[1] > 0 ? 1 : 0;
+    const active = lc[6] > 0 ? 6 : lc[5] > 0 ? 5 : lc[4] > 0 ? 4 : lc[3] > 0 ? 3 : lc[2] > 0 ? 2 : lc[1] > 0 ? 1 : 0;
     if (active > 0) {
       gradeEl.textContent = `${GRADE_DATA[active].grade} · In Progress`;
       standardEl.textContent = GRADE_DATA[active].standard;
@@ -2117,6 +2164,16 @@ function clearStage() {
   marsStorms.length = 0;
   tanks.length = 0;
   gasPuffs.length = 0;
+  mowers.length = 0;
+  sprinklers.length = 0;
+  sunbeams.length = 0;
+  spores.length = 0;
+  flames.length = 0;
+  smokes.length = 0;
+  grassBits.length = 0;
+  waterDrops.length = 0;
+  webs.length = 0;
+  poops.length = 0;
   decals.length = 0;
   droplets.length = 0;
   frozenIds.clear();
@@ -2147,6 +2204,11 @@ function switchWorld(id) {
     World.add(engine.world, spawnCrate(W * 0.35, H - 140));
     spawnAstro(W * 0.62, H - 160);
     log('Touchdown on Mars.', 'solve');
+  } else if (id === 'yard') {
+    World.add(engine.world, spawnCrate(W * 0.3, H - 120));
+    spawnBug(W * 0.55, H - 80);
+    spawnBug(W * 0.72, H - 90);
+    log('Shrunk to bug size. The lawn looms overhead.', 'solve');
   } else {
     for (let i = 0; i < 3; i++) World.add(engine.world, spawnCrate(W * 0.3 + i * 60, H - 100));
     spawnDummy(W * 0.7, H - 140);
@@ -2393,7 +2455,7 @@ Events.on(engine, 'collisionStart', (e) => {
       jelly.stingReadyAt = now + 1600;
       jelly.stingFlashUntil = now + 350;
       spurt(other.position.x, other.position.y, 2, 0, -1);
-      if (victim.damage > 45) dismember(victim);
+      if (victim.damage > (victim.maxDamage || 45)) dismember(victim);
       log('Stung — paralyzed.', 'hint');
     }
   }
@@ -2544,7 +2606,7 @@ Events.on(engine, 'beforeUpdate', () => {
         if (bp === 'legL' && nearest.partDamage.legL > 14) breakLeg(nearest, 'L');
         if (bp === 'legR' && nearest.partDamage.legR > 14) breakLeg(nearest, 'R');
         if (bp === 'back' && nearest.partDamage.back > 18) breakBack(nearest);
-        if (nearest.damage > 45) dismember(nearest);
+        if (nearest.damage > (nearest.maxDamage || 45)) dismember(nearest);
         // dart backwards after the bite
         Body.applyForce(body, body.position, { x: -(dx / d) * 0.01 * body.mass, y: rand(-0.008, 0) * body.mass });
         pir.biteReadyAt = now + rand(550, 1100);
@@ -2858,7 +2920,7 @@ Events.on(engine, 'beforeUpdate', () => {
         spurt(tb.position.x, tb.position.y, 4, 0, -1);
         Body.applyForce(tb, tb.position, { x: rand(-0.02, 0.02) * tb.mass, y: -0.02 * tb.mass });
         if (t.partDamage.back > 18 && t.backOk) breakBack(t);
-        if (t.damage > 45) dismember(t);
+        if (t.damage > (t.maxDamage || 45)) dismember(t);
       }
       eel.zapUntil = now + 420;
       eel.zapNextAt = now + 3400;
@@ -3929,6 +3991,1306 @@ document.getElementById('panel-toggle').addEventListener('click', () => {
   requestAnimationFrame(() => rebuildWalls());
 });
 
+// ---------- WORLD 4: THE YARD ----------
+// Bug-scale front lawn at dusk. Towering grass, pollen, fireflies — and
+// everything suburbia throws at an insect: dog poop, ant columns, garden
+// spiders, cordyceps spores, a kid's magnifying glass, a fire-breathing
+// lizard the size of a kaiju, and the lawnmower.
+// ====================================================================
+
+const mowers = [];
+const sprinklers = [];
+const sunbeams = [];
+const spores = [];      // cordyceps spores seeking a host { x, y, wob, life }
+const flames = [];      // fire particles { x, y, vx, vy, r, life, srcId }
+const smokes = [];      // grey puffs { x, y, vx, vy, r, life }
+const grassBits = [];   // mower clippings { x, y, vx, vy, life }
+const waterDrops = [];  // sprinkler spray { x, y, vx, vy, life }
+const webs = [];        // spider silk { sid, tid, until }
+const poops = [];       // poop bodies (stickiness + fly orbits)
+
+const CHAR_COLORS = ['#241c14', '#181410', '#2e241a'];
+
+function spawnSmoke(x, y, r) {
+  smokes.push({ x, y, vx: rand(-0.3, 0.3), vy: -rand(0.5, 1.1), r, life: rand(30, 60) });
+  if (smokes.length > 160) smokes.shift();
+}
+
+// ---------- Burning ----------
+// Shared by the magnifying glass and the lizard's breath. Burning bodies
+// take damage over time, char, smoke, and shed flames that can spread to
+// anything flammable they touch.
+
+function igniteDummy(d, ms = 3200) {
+  if (!d || d.dead || d.kind === 'lizard') return;
+  const now = performance.now();
+  if (!d.burningUntil || d.burningUntil < now) d.burnTickAt = now;
+  d.burningUntil = Math.max(d.burningUntil || 0, now + ms);
+}
+
+Events.on(engine, 'beforeUpdate', () => {
+  const now = performance.now();
+  for (const [id, d] of dummies) {
+    if (!d.burningUntil || now > d.burningUntil || d.dead) continue;
+    // Shed flames from random limbs — these can spread to neighbours
+    if (Math.random() < 0.5) {
+      const p = pick(d.parts);
+      flames.push({
+        x: p.position.x + rand(-6, 6), y: p.position.y + rand(-8, 4),
+        vx: rand(-0.4, 0.4), vy: -rand(0.8, 1.8),
+        r: rand(3, 6), life: rand(18, 32), srcId: id,
+      });
+    }
+    if (Math.random() < 0.2) spawnSmoke(d.limbs.torso.position.x, d.limbs.torso.position.y - 14, rand(3, 5));
+    if (now > d.burnTickAt) {
+      d.burnTickAt = now + 420;
+      const limb = pick(d.parts);
+      const dmg = 3;
+      d.damage += dmg;
+      const bp = limb.bodyPart;
+      if (bp && d.partDamage[bp] !== undefined) d.partDamage[bp] += dmg;
+      limb.render.fillStyle = pick(CHAR_COLORS);
+      if (bp === 'legL' && d.partDamage.legL > 14) breakLeg(d, 'L');
+      if (bp === 'legR' && d.partDamage.legR > 14) breakLeg(d, 'R');
+      if (bp === 'back' && d.partDamage.back > 18) breakBack(d);
+      if (d.damage > (d.maxDamage || 45)) dismember(d);
+    }
+  }
+
+  // Flame particles: drift, rise, and ignite flesh they touch
+  const fleshBodies = flames.length
+    ? Composite.allBodies(engine.world).filter(b => b.label === 'flesh')
+    : [];
+  for (let i = flames.length - 1; i >= 0; i--) {
+    const f = flames[i];
+    f.x += f.vx; f.y += f.vy;
+    f.vy -= 0.03;
+    f.r *= 0.97;
+    f.life -= 1;
+    if (f.life <= 0 || f.r < 1) { flames.splice(i, 1); continue; }
+    for (const body of fleshBodies) {
+      if (body.dummyId === f.srcId) continue;
+      const dd = Math.hypot(body.position.x - f.x, body.position.y - f.y);
+      if (dd < f.r + 12) {
+        const d = dummies.get(body.dummyId);
+        if (d && !d.dead && (!d.burningUntil || now > d.burningUntil)) {
+          igniteDummy(d, 3200);
+          if (d.kind !== 'lizard') log('Caught fire.', 'hint');
+        }
+      }
+    }
+  }
+  if (flames.length > 170) flames.splice(0, flames.length - 170);
+});
+
+// ---------- Ladybug ----------
+// The Yard's resident victim. Wide chamfered shell, side-mounted head,
+// stubby legs. kind 'human' so every existing predator AI hunts it.
+
+function spawnBug(x, y) {
+  const id = nextDummyId++;
+  const group = Body.nextGroup(true);
+  const tag = (b, part) => { b.label = 'flesh'; b.dummyId = id; b.bodyPart = part; return b; };
+
+  // Density bumped: limbs this small explode the constraint solver at
+  // default density when something heavy slams them.
+  const shell = '#c23b2a', chitin = '#15161a';
+  const bugOpts = { collisionFilter: { group }, density: 0.0016 };
+  const head = tag(Bodies.circle(x - 19, y - 4, 9, { ...bugOpts, render: { fillStyle: chitin } }), 'head');
+  const torso = tag(Bodies.rectangle(x, y - 4, 34, 20, { chamfer: { radius: 9 }, ...bugOpts, render: { fillStyle: shell } }), 'back');
+  const legL = tag(Bodies.rectangle(x - 8, y + 12, 7, 16, { ...bugOpts, render: { fillStyle: chitin } }), 'legL');
+  const legR = tag(Bodies.rectangle(x + 8, y + 12, 7, 16, { ...bugOpts, render: { fillStyle: chitin } }), 'legR');
+
+  // The posture controller's torque scales with mass but stability scales
+  // with inertia — parts this small spin up unstably unless inertia is
+  // raised to the same envelope as the standard dummy's limbs.
+  Body.setInertia(head, 50);
+  Body.setInertia(legL, 45);
+  Body.setInertia(legR, 45);
+
+  const parts = [head, torso, legL, legR];
+  const joinOpts = { stiffness: 0.8, damping: 0.35, length: 0, render: { visible: false } };
+  // Legs get paired constraints (quasi-welded): the generic leg-posture
+  // torque is unstable on limbs this stubby, so the bug opts out of the
+  // standard posture system and keeps itself upright with its own handler.
+  const joints = {
+    neck:  Constraint.create({ bodyA: head, bodyB: torso, pointA: { x: 6, y: -4 }, pointB: { x: -15, y: -4 }, ...joinOpts }),
+    neck2: Constraint.create({ bodyA: head, bodyB: torso, pointA: { x: 6, y: 4 },  pointB: { x: -15, y: 4 },  ...joinOpts }),
+    hipL:  Constraint.create({ bodyA: torso, bodyB: legL, pointA: { x: -11, y: 8 }, pointB: { x: -3, y: -7 }, ...joinOpts }),
+    hipL2: Constraint.create({ bodyA: torso, bodyB: legL, pointA: { x: -5, y: 8 },  pointB: { x: 3, y: -7 }, ...joinOpts }),
+    hipR:  Constraint.create({ bodyA: torso, bodyB: legR, pointA: { x: 5, y: 8 },   pointB: { x: -3, y: -7 }, ...joinOpts }),
+    hipR2: Constraint.create({ bodyA: torso, bodyB: legR, pointA: { x: 11, y: 8 },  pointB: { x: 3, y: -7 }, ...joinOpts }),
+  };
+  const constraints = Object.values(joints);
+
+  dummies.set(id, {
+    kind: 'human',
+    isBug: true,
+    parts, constraints, joints,
+    limbs: { head, torso, legL, legR },
+    damage: 0,
+    partDamage: { back: 0, legL: 0, legR: 0, neck: 0, head: 0 },
+    legsOk: { L: true, R: true },
+    backOk: true,
+    standing: false, // opts out of the humanoid posture controller
+    dead: false,
+  });
+  World.add(engine.world, [...parts, ...constraints]);
+  return null;
+}
+
+// Bug posture: a single gentle upright torque on the torso, tuned for its
+// mass/inertia ratio (the shared STAND_K/STAND_D constants overshoot here).
+Events.on(engine, 'beforeUpdate', () => {
+  const now = performance.now();
+  for (const d of dummies.values()) {
+    if (!d.isBug || d.dead || !d.backOk || !d.legsOk.L || !d.legsOk.R) continue;
+    if (d.paralyzedUntil && now < d.paralyzedUntil) continue;
+    uprightTorque(d.limbs.torso, 0.0005, 0.013);
+  }
+});
+
+// Ladybug render: elytra dome, spots, seam, antennae
+Events.on(render, 'afterRender', () => {
+  const ctx = render.context;
+  const now = performance.now();
+  for (const d of dummies.values()) {
+    if (!d.isBug) continue;
+    const torso = d.limbs.torso, head = d.limbs.head;
+    if (torso) {
+      ctx.save();
+      ctx.translate(torso.position.x, torso.position.y);
+      ctx.rotate(torso.angle);
+      // Dome
+      ctx.beginPath();
+      ctx.ellipse(0, -3, 16, 10, 0, Math.PI, 0);
+      ctx.fillStyle = d.dead ? 'rgba(90,30,22,0.7)' : 'rgba(160,40,28,0.8)';
+      ctx.fill();
+      // Seam
+      ctx.beginPath();
+      ctx.moveTo(0, -13);
+      ctx.lineTo(0, 5);
+      ctx.strokeStyle = 'rgba(20,10,8,0.7)';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      // Spots
+      ctx.fillStyle = '#15161a';
+      for (const [sx, sy] of [[-8, -4], [-3, -9], [5, -8], [10, -2]]) {
+        ctx.beginPath();
+        ctx.arc(sx, sy, 2.2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+    if (head && !d.dead) {
+      ctx.save();
+      ctx.translate(head.position.x, head.position.y);
+      ctx.rotate(head.angle);
+      const wig = Math.sin(now / 250 + head.position.x) * 0.18;
+      ctx.strokeStyle = '#15161a';
+      ctx.lineWidth = 1.4;
+      for (const s of [-1, 1]) {
+        ctx.beginPath();
+        ctx.moveTo(-3, s * 2 - 4);
+        ctx.quadraticCurveTo(-10, -8 + s * 2 + wig * 4, -13, -10 + s * 3 + wig * 6);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+  }
+});
+
+// ---------- Dog Poop ----------
+// Sticky hazard. Anything that wanders close gets bogged down; flesh that
+// touches it picks up flies for a while. Mowing it is a mistake.
+
+function spawnPoop(x, y) {
+  const p = Bodies.circle(x, y, 16, {
+    density: 0.004, friction: 1, frictionStatic: 2, restitution: 0,
+    render: { fillStyle: '#5a3a1e', strokeStyle: '#3a2410', lineWidth: 2 },
+    label: 'poop',
+  });
+  p.poopData = { flies: Array.from({ length: 4 }, () => rand(0, Math.PI * 2)) };
+  poops.push(p);
+  return p;
+}
+
+// Stickiness + fly-fouling
+Events.on(engine, 'beforeUpdate', () => {
+  if (poops.length === 0) return;
+  const now = performance.now();
+  const worldBodies = Composite.allBodies(engine.world);
+  for (let i = poops.length - 1; i >= 0; i--) {
+    const p = poops[i];
+    if (!worldBodies.includes(p)) { poops.splice(i, 1); continue; }
+    for (const body of worldBodies) {
+      if (body.isStatic || body === p) continue;
+      const dd = Math.hypot(body.position.x - p.position.x, body.position.y - p.position.y);
+      if (dd > 38) continue;
+      Body.setVelocity(body, { x: body.velocity.x * 0.86, y: body.velocity.y * 0.86 });
+      Body.setAngularVelocity(body, body.angularVelocity * 0.9);
+      if (body.label === 'flesh') {
+        const d = dummies.get(body.dummyId);
+        if (d) d.fouledUntil = now + 4000;
+      }
+    }
+  }
+});
+
+// Poop render: mound texture, orbiting flies, stink lines
+Events.on(render, 'afterRender', () => {
+  if (state.world !== 'yard') return;
+  const ctx = render.context;
+  const now = performance.now();
+  const drawFlies = (cx, cy, phases) => {
+    ctx.fillStyle = '#1a1c1e';
+    for (const ph of phases) {
+      const fx = cx + Math.cos(now / 300 + ph) * (16 + Math.sin(now / 700 + ph) * 7);
+      const fy = cy - 14 + Math.sin(now / 220 + ph * 2) * 10;
+      ctx.beginPath();
+      ctx.arc(fx, fy, 1.6, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  };
+  for (const p of poops) {
+    const { x, y } = p.position;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(p.angle);
+    // Swirl tip + bumps
+    ctx.fillStyle = '#4c3018';
+    ctx.beginPath();
+    ctx.ellipse(-5, -10, 8, 5, -0.3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(2, -15, 5, 3.5, 0.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    // Stink lines
+    ctx.strokeStyle = 'rgba(150,170,90,0.35)';
+    ctx.lineWidth = 1.3;
+    for (const s of [-1, 0, 1]) {
+      const rise = (now / 14 + s * 37) % 46;
+      ctx.beginPath();
+      ctx.moveTo(x + s * 8 + Math.sin(now / 200 + s) * 2, y - 16 - rise);
+      ctx.quadraticCurveTo(x + s * 8 + 4, y - 24 - rise, x + s * 8, y - 32 - rise);
+      ctx.globalAlpha = 1 - rise / 46;
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+    drawFlies(x, y, p.poopData.flies);
+  }
+  // Flies follow fouled creatures
+  for (const d of dummies.values()) {
+    if (!d.fouledUntil || now > d.fouledUntil || d.dead) continue;
+    const t = d.limbs.torso;
+    drawFlies(t.position.x, t.position.y, [0.5, 2.6, 4.4]);
+  }
+});
+
+// ---------- Ant Column ----------
+// Six workers. Each marches at the nearest victim and bites the closest
+// limb, piranha-style, then backs off for another pass.
+
+function spawnAnts(x, y) {
+  for (let i = 0; i < 6; i++) spawnAnt(x + rand(-50, 50), y + rand(-10, 10));
+  return null;
+}
+
+function spawnAnt(x, y) {
+  const id = nextDummyId++;
+  const body = Bodies.circle(x, y, 5, {
+    density: 0.0015, friction: 0.6, frictionAir: 0.02,
+    render: { visible: false },
+  });
+  body.label = 'flesh'; body.dummyId = id; body.bodyPart = 'back';
+  dummies.set(id, {
+    kind: 'ant',
+    parts: [body], constraints: [], joints: {},
+    limbs: { torso: body },
+    damage: 0, partDamage: { back: 0 },
+    legsOk: { L: false, R: false }, backOk: true,
+    standing: false, dead: false,
+    facing: 1,
+    biteReadyAt: 0,
+    gait: rand(0, Math.PI * 2),
+  });
+  World.add(engine.world, body);
+  return null;
+}
+
+// Ant AI: march, bite, back off
+Events.on(engine, 'beforeUpdate', () => {
+  const now = performance.now();
+  let prey = null;
+  for (const ant of dummies.values()) {
+    if (ant.kind !== 'ant' || ant.dead) continue;
+    if (ant.paralyzedUntil && now < ant.paralyzedUntil) continue;
+    if (!prey) {
+      prey = [...dummies.values()].filter(d =>
+        (d.kind === 'human' || d.kind === 'duck' || d.kind === 'monster') && !d.dead);
+    }
+    if (prey.length === 0) return;
+    const body = ant.limbs.torso;
+
+    let nearest = null, bestD = Infinity;
+    for (const t of prey) {
+      const tt = t.limbs.torso;
+      const dd = Math.hypot(tt.position.x - body.position.x, tt.position.y - body.position.y);
+      if (dd < bestD) { bestD = dd; nearest = t; }
+    }
+    if (!nearest) continue;
+
+    const dx = nearest.limbs.torso.position.x - body.position.x;
+    if (Math.abs(dx) > 4) ant.facing = Math.sign(dx);
+    Body.applyForce(body, body.position, { x: ant.facing * 0.0045 * body.mass, y: -0.0004 * body.mass });
+
+    if (now > ant.biteReadyAt) {
+      let limb = null, ld = Infinity;
+      for (const part of nearest.parts) {
+        const dd = Math.hypot(part.position.x - body.position.x, part.position.y - body.position.y);
+        if (dd < ld) { ld = dd; limb = part; }
+      }
+      if (limb && ld < 24) {
+        const dmg = 2.5;
+        nearest.damage += dmg;
+        const bp = limb.bodyPart;
+        if (bp && nearest.partDamage[bp] !== undefined) nearest.partDamage[bp] += dmg;
+        spurt(limb.position.x, limb.position.y, 2, rand(-1, 1), rand(-1, 0));
+        if (bp === 'legL' && nearest.partDamage.legL > 14) breakLeg(nearest, 'L');
+        if (bp === 'legR' && nearest.partDamage.legR > 14) breakLeg(nearest, 'R');
+        if (bp === 'back' && nearest.partDamage.back > 18) breakBack(nearest);
+        if (nearest.damage > (nearest.maxDamage || 45)) dismember(nearest);
+        Body.applyForce(body, body.position, { x: -ant.facing * 0.008 * body.mass, y: -0.003 * body.mass });
+        ant.biteReadyAt = now + rand(700, 1300);
+      }
+    }
+  }
+});
+
+// Ant render: three segments + scurrying legs
+Events.on(render, 'afterRender', () => {
+  const ctx = render.context;
+  const now = performance.now();
+  for (const ant of dummies.values()) {
+    if (ant.kind !== 'ant') continue;
+    const b = ant.limbs.torso;
+    const { x, y } = b.position;
+    const f = ant.facing || 1;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(f, 1);
+    ctx.fillStyle = ant.dead ? '#3a2c20' : '#5a2e10';
+    // Abdomen, thorax, head
+    ctx.beginPath(); ctx.ellipse(-5, 0, 4.5, 3.2, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(0, -1, 2.6, 2.2, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(4.5, -1, 2.4, 0, Math.PI * 2); ctx.fill();
+    // Legs
+    if (!ant.dead) {
+      ctx.strokeStyle = '#3a2010';
+      ctx.lineWidth = 1;
+      for (let k = 0; k < 3; k++) {
+        const sw = Math.sin(now / 70 + ant.gait + k * 2.1) * 2;
+        ctx.beginPath();
+        ctx.moveTo(-3 + k * 3, 1);
+        ctx.lineTo(-4 + k * 3 + sw, 5.5);
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
+  }
+});
+
+// ---------- Garden Spider ----------
+// Stalks the nearest victim. At range it shoots a web — paralysis plus a
+// silk wrap — then scuttles in to bite.
+
+function spawnSpider(x, y) {
+  const id = nextDummyId++;
+  const body = Bodies.circle(x, y, 12, {
+    density: 0.0022, friction: 0.7, frictionAir: 0.03,
+    render: { visible: false },
+  });
+  body.label = 'flesh'; body.dummyId = id; body.bodyPart = 'back';
+  dummies.set(id, {
+    kind: 'spider',
+    parts: [body], constraints: [], joints: {},
+    limbs: { torso: body },
+    damage: 0, partDamage: { back: 0 },
+    legsOk: { L: false, R: false }, backOk: true,
+    standing: false, dead: false,
+    facing: 1,
+    webReadyAt: 0,
+    biteReadyAt: 0,
+  });
+  World.add(engine.world, body);
+  return null;
+}
+
+// Spider AI
+Events.on(engine, 'beforeUpdate', () => {
+  const now = performance.now();
+  for (const [sid, sp] of dummies) {
+    if (sp.kind !== 'spider' || sp.dead) continue;
+    if (sp.paralyzedUntil && now < sp.paralyzedUntil) continue;
+    const body = sp.limbs.torso;
+    const prey = [...dummies.values()].filter(d =>
+      (d.kind === 'human' || d.kind === 'duck' || d.kind === 'monster') && !d.dead);
+    if (prey.length === 0) continue;
+
+    let nearest = null, tid = null, bestD = Infinity;
+    for (const [did, t] of dummies) {
+      if (!prey.includes(t)) continue;
+      const tt = t.limbs.torso;
+      const dd = Math.hypot(tt.position.x - body.position.x, tt.position.y - body.position.y);
+      if (dd < bestD) { bestD = dd; nearest = t; tid = did; }
+    }
+    if (!nearest) continue;
+
+    const dx = nearest.limbs.torso.position.x - body.position.x;
+    if (Math.abs(dx) > 4) sp.facing = Math.sign(dx);
+
+    // Web shot: paralyze at range
+    if (bestD < 240 && bestD > 50 && now > sp.webReadyAt) {
+      nearest.paralyzedUntil = now + 2400;
+      webs.push({ sid, tid, until: now + 2400 });
+      sp.webReadyAt = now + rand(4200, 6200);
+      log('Webbed.', 'hint');
+    }
+
+    if (bestD > 45) {
+      Body.applyForce(body, body.position, { x: sp.facing * 0.007 * body.mass, y: 0 });
+    } else if (now > sp.biteReadyAt) {
+      let limb = null, ld = Infinity;
+      for (const part of nearest.parts) {
+        const dd = Math.hypot(part.position.x - body.position.x, part.position.y - body.position.y);
+        if (dd < ld) { ld = dd; limb = part; }
+      }
+      if (limb && ld < 45) {
+        const dmg = 4;
+        nearest.damage += dmg;
+        const bp = limb.bodyPart;
+        if (bp && nearest.partDamage[bp] !== undefined) nearest.partDamage[bp] += dmg;
+        spurt(limb.position.x, limb.position.y, 3, rand(-1, 1), rand(-1, 0));
+        addDecal(limb.position.x, limb.position.y, 2);
+        if (bp === 'legL' && nearest.partDamage.legL > 14) breakLeg(nearest, 'L');
+        if (bp === 'legR' && nearest.partDamage.legR > 14) breakLeg(nearest, 'R');
+        if (bp === 'back' && nearest.partDamage.back > 18) breakBack(nearest);
+        if (nearest.damage > (nearest.maxDamage || 45)) dismember(nearest);
+        sp.biteReadyAt = now + rand(650, 1000);
+      }
+    }
+  }
+});
+
+// Spider render: body, eyes, eight animated legs; silk strands + wraps
+Events.on(render, 'afterRender', () => {
+  const ctx = render.context;
+  const now = performance.now();
+  for (const sp of dummies.values()) {
+    if (sp.kind !== 'spider') continue;
+    const b = sp.limbs.torso;
+    const { x, y } = b.position;
+    const moving = Math.abs(b.velocity.x) > 0.3;
+    ctx.save();
+    ctx.translate(x, y);
+    // Legs: four per side, bent outward
+    ctx.strokeStyle = sp.dead ? '#2c241c' : '#3a2e20';
+    ctx.lineWidth = 2;
+    for (let k = 0; k < 4; k++) {
+      for (const s of [-1, 1]) {
+        const base = -0.9 + k * 0.6;
+        const step = moving && !sp.dead ? Math.sin(now / 80 + k * 1.7 + s) * 0.18 : 0;
+        const a = base + step;
+        const kx = s * Math.cos(a) * 16, ky = Math.sin(a) * 8 - 2;
+        ctx.beginPath();
+        ctx.moveTo(s * 4, -2);
+        ctx.quadraticCurveTo(kx * 0.7, ky - 8, kx, ky + 12);
+        ctx.stroke();
+      }
+    }
+    // Abdomen + cephalothorax
+    ctx.fillStyle = sp.dead ? '#2c241c' : '#46301c';
+    ctx.beginPath(); ctx.ellipse(-(sp.facing || 1) * 6, -1, 9, 7.5, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = sp.dead ? '#241e16' : '#332414';
+    ctx.beginPath(); ctx.arc((sp.facing || 1) * 6, 0, 6, 0, Math.PI * 2); ctx.fill();
+    // Eyes
+    if (!sp.dead) {
+      ctx.fillStyle = '#c43c2c';
+      for (const e of [-2, 2]) {
+        ctx.beginPath();
+        ctx.arc((sp.facing || 1) * (7 + Math.abs(e) * 0.4), -2 + e * 0.5, 1.1, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    ctx.restore();
+  }
+
+  // Silk strands + wraps
+  for (let i = webs.length - 1; i >= 0; i--) {
+    const w = webs[i];
+    if (now > w.until) { webs.splice(i, 1); continue; }
+    const sp = dummies.get(w.sid), t = dummies.get(w.tid);
+    if (!sp || !t) { webs.splice(i, 1); continue; }
+    const a = sp.limbs.torso.position, b = t.limbs.torso.position;
+    ctx.strokeStyle = 'rgba(230,235,240,0.45)';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.quadraticCurveTo((a.x + b.x) / 2, (a.y + b.y) / 2 + 14, b.x, b.y);
+    ctx.stroke();
+    // Wrap on the victim
+    ctx.save();
+    ctx.translate(b.x, b.y);
+    ctx.rotate(t.limbs.torso.angle);
+    ctx.strokeStyle = 'rgba(235,240,245,0.55)';
+    for (let k = -2; k <= 2; k++) {
+      ctx.beginPath();
+      ctx.ellipse(0, k * 7, 18, 4, 0.15 * k, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+});
+
+// ---------- Cordyceps ----------
+// A spore drifts to the nearest victim's head and takes root. The host
+// staggers as the stalk grows, gets eaten from the head down, fungifies,
+// and finally the cap bursts — releasing fresh spores.
+
+const FUNGUS_KILL_AT = 4200;   // ms from infection to head fully consumed
+const FUNGUS_SPORE_AT = 9000;  // ms until the cap bursts
+
+function spawnSpore(x, y) {
+  spores.push({ x, y, wob: rand(0, Math.PI * 2), life: 1400 });
+  return null;
+}
+
+// Spore drift + infection progression
+Events.on(engine, 'beforeUpdate', () => {
+  const now = performance.now();
+
+  for (let i = spores.length - 1; i >= 0; i--) {
+    const s = spores[i];
+    s.life -= 1;
+    s.wob += 0.05;
+    if (s.life <= 0) { spores.splice(i, 1); continue; }
+
+    let target = null, bestD = Infinity;
+    for (const d of dummies.values()) {
+      if (d.dead || d.fungus) continue;
+      if (d.kind !== 'human' && d.kind !== 'duck' && d.kind !== 'monster') continue;
+      const h = d.limbs.head || d.limbs.torso;
+      const dd = Math.hypot(h.position.x - s.x, h.position.y - s.y);
+      if (dd < bestD) { bestD = dd; target = d; }
+    }
+    if (target) {
+      const h = target.limbs.head || target.limbs.torso;
+      const dx = h.position.x - s.x, dy = h.position.y - s.y;
+      const dd = Math.hypot(dx, dy) || 1;
+      s.x += (dx / dd) * 1.25 + Math.sin(s.wob) * 0.5;
+      s.y += (dy / dd) * 1.25 + Math.cos(s.wob * 0.8) * 0.5;
+      if (dd < 16) {
+        target.fungus = { at: now, tickAt: 0, spent: false, grew: {} };
+        log('Spore took root.', 'hint');
+        spores.splice(i, 1);
+      }
+    } else {
+      s.x += Math.sin(s.wob) * 0.7;
+      s.y += Math.cos(s.wob * 0.6) * 0.5 - 0.15;
+    }
+  }
+
+  for (const d of dummies.values()) {
+    if (!d.fungus) continue;
+    const ft = now - d.fungus.at;
+    const head = d.limbs.head || d.limbs.torso;
+
+    if (!d.dead && ft < FUNGUS_KILL_AT) {
+      // Staggering host: twitchy, lurching, losing the fight
+      if (Math.random() < 0.1) {
+        Body.applyForce(d.limbs.torso, d.limbs.torso.position,
+          { x: rand(-0.01, 0.01) * d.limbs.torso.mass, y: 0 });
+        Body.setAngularVelocity(head, head.angularVelocity + rand(-0.12, 0.12));
+      }
+      if (now > d.fungus.tickAt) {
+        d.fungus.tickAt = now + 600;
+        d.damage += 2;
+        if (d.partDamage.head !== undefined) d.partDamage.head += 2;
+      }
+    } else if (!d.dead && ft >= FUNGUS_KILL_AT) {
+      d.dead = true;
+      d.standing = false;
+      head.render.fillStyle = '#d8d2bc';
+      log('Consumed from the head down.', 'solve');
+    }
+
+    // Post-mortem overgrowth, head down
+    if (d.dead && !d.fungus.grew.torso && ft > 5500) {
+      d.fungus.grew.torso = true;
+      d.limbs.torso.render.fillStyle = '#c9c2a8';
+    }
+    if (d.dead && !d.fungus.grew.limbs && ft > 7000) {
+      d.fungus.grew.limbs = true;
+      for (const p of d.parts) {
+        if (p === head || p === d.limbs.torso) continue;
+        p.render.fillStyle = '#b5ae94';
+      }
+    }
+    if (!d.fungus.spent && ft > FUNGUS_SPORE_AT) {
+      d.fungus.spent = true;
+      spawnSpore(head.position.x + rand(-6, 6), head.position.y - 30);
+      spawnSpore(head.position.x + rand(-6, 6), head.position.y - 36);
+      log('The cap bursts — spores adrift.', 'hint');
+    }
+  }
+});
+
+// Cordyceps render: drifting spores, growing stalk + cap, shelf fungi
+Events.on(render, 'afterRender', () => {
+  const ctx = render.context;
+  const now = performance.now();
+
+  for (const s of spores) {
+    const halo = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, 8);
+    halo.addColorStop(0, 'rgba(225,218,185,0.8)');
+    halo.addColorStop(1, 'rgba(225,218,185,0)');
+    ctx.fillStyle = halo;
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, 8, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, 2, 0, Math.PI * 2);
+    ctx.fillStyle = '#e5dcb8';
+    ctx.fill();
+  }
+
+  for (const d of dummies.values()) {
+    if (!d.fungus) continue;
+    const ft = now - d.fungus.at;
+    const head = d.limbs.head || d.limbs.torso;
+    if (ft < 1200) continue;
+
+    const len = Math.min(34, (ft - 1200) / 160);
+    const hx = head.position.x, hy = head.position.y;
+    const sway = Math.sin(now / 900 + hx) * 3;
+    // Stalk
+    ctx.strokeStyle = '#cfc6a0';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(hx, hy);
+    ctx.quadraticCurveTo(hx + sway, hy - len * 0.6, hx + sway * 1.5, hy - len);
+    ctx.stroke();
+    // Cap
+    const capR = Math.min(9, len * 0.32);
+    if (capR > 2) {
+      ctx.fillStyle = d.fungus.spent ? '#9a9176' : '#c2552e';
+      ctx.beginPath();
+      ctx.ellipse(hx + sway * 1.5, hy - len, capR, capR * 0.65, 0, Math.PI, 0);
+      ctx.fill();
+      ctx.fillStyle = '#e8dfc0';
+      ctx.beginPath();
+      ctx.ellipse(hx + sway * 1.5, hy - len + 1, capR * 0.8, capR * 0.25, 0, 0, Math.PI);
+      ctx.fill();
+    }
+    // Shelf fungi sprouting along the dead host
+    if (d.dead && ft > 5500) {
+      ctx.fillStyle = '#d8d0b0';
+      for (const p of d.parts) {
+        if (p === head) continue;
+        const n = ((p.id * 7919) % 3) + 1;
+        for (let k = 0; k < n; k++) {
+          const a = (p.id * 31 + k * 137) % 360 / 57.3;
+          ctx.beginPath();
+          ctx.ellipse(p.position.x + Math.cos(a) * 8, p.position.y + Math.sin(a) * 6, 3.5, 2, a, Math.PI, 0);
+          ctx.fill();
+        }
+      }
+    }
+  }
+});
+
+// ---------- Fire Lizard ----------
+// The Yard's villain. At bug scale a backyard lizard is a kaiju: heavy,
+// hard to kill (maxDamage 140), and it breathes cones of fire.
+
+function spawnLizard(x, y) {
+  const id = nextDummyId++;
+  const group = Body.nextGroup(true);
+  const tag = (b, part) => { b.label = 'flesh'; b.dummyId = id; b.bodyPart = part; return b; };
+
+  const hide = '#4a6a2e', hideDark = '#33491e', belly = '#7a8a4e';
+  const opts = { collisionFilter: { group }, density: 0.0022, frictionAir: 0.02 };
+  const head = tag(Bodies.circle(x + 44, y - 14, 15, { ...opts, render: { fillStyle: hide } }), 'head');
+  const torso = tag(Bodies.rectangle(x, y - 8, 66, 30, { chamfer: { radius: 12 }, ...opts, render: { fillStyle: hide } }), 'back');
+  const legL = tag(Bodies.rectangle(x - 20, y + 16, 11, 26, { ...opts, render: { fillStyle: hideDark } }), 'legL');
+  const legR = tag(Bodies.rectangle(x + 20, y + 16, 11, 26, { ...opts, render: { fillStyle: hideDark } }), 'legR');
+  const tail = tag(Bodies.rectangle(x - 52, y - 12, 40, 10, { chamfer: { radius: 5 }, ...opts, render: { fillStyle: belly } }), 'tail');
+
+  const parts = [head, torso, legL, legR, tail];
+  const joinOpts = { stiffness: 0.9, damping: 0.3, length: 0, render: { visible: false } };
+  // Paired hip constraints keep the stubby legs planted without the generic
+  // leg-posture torque, which is unstable on limbs with this mass/inertia
+  // ratio (legsOk false below opts them out; torso + head posture still apply).
+  const joints = {
+    neck:  Constraint.create({ bodyA: head, bodyB: torso, pointA: { x: -10, y: -5 }, pointB: { x: 30, y: -10 }, ...joinOpts }),
+    neck2: Constraint.create({ bodyA: head, bodyB: torso, pointA: { x: -10, y: 5 },  pointB: { x: 30, y: 2 },  ...joinOpts }),
+    hipL:  Constraint.create({ bodyA: torso, bodyB: legL, pointA: { x: -24, y: 13 }, pointB: { x: -4, y: -11 }, ...joinOpts }),
+    hipL2: Constraint.create({ bodyA: torso, bodyB: legL, pointA: { x: -16, y: 13 }, pointB: { x: 4, y: -11 }, ...joinOpts }),
+    hipR:  Constraint.create({ bodyA: torso, bodyB: legR, pointA: { x: 16, y: 13 },  pointB: { x: -4, y: -11 }, ...joinOpts }),
+    hipR2: Constraint.create({ bodyA: torso, bodyB: legR, pointA: { x: 24, y: 13 },  pointB: { x: 4, y: -11 }, ...joinOpts }),
+    tailJ: Constraint.create({ bodyA: torso, bodyB: tail, pointA: { x: -32, y: -4 }, pointB: { x: 18, y: 0 }, stiffness: 0.6, damping: 0.2, length: 2, render: { visible: false } }),
+  };
+  const constraints = Object.values(joints);
+
+  dummies.set(id, {
+    kind: 'lizard',
+    maxDamage: 140,
+    parts, constraints, joints,
+    limbs: { head, torso, legL, legR, tail },
+    damage: 0,
+    partDamage: { back: 0, legL: 0, legR: 0, neck: 0, head: 0, tail: 0 },
+    legsOk: { L: false, R: false }, // legs are welded, not posture-driven
+    backOk: true,
+    standing: true,
+    dead: false,
+    facing: 1,
+    breathUntil: 0,
+    breathReadyAt: performance.now() + 1800,
+  });
+  World.add(engine.world, [...parts, ...constraints]);
+  log('Something large stirs in the grass.', 'hint');
+  return null;
+}
+
+// Lizard AI: stalk, then breathe fire
+Events.on(engine, 'beforeUpdate', () => {
+  const now = performance.now();
+  for (const [id, lz] of dummies) {
+    if (lz.kind !== 'lizard' || lz.dead) continue;
+    if (lz.paralyzedUntil && now < lz.paralyzedUntil) continue;
+    const torso = lz.limbs.torso, head = lz.limbs.head;
+
+    // Breathing fire: spew particles from the mouth
+    if (now < lz.breathUntil) {
+      const mx = head.position.x + lz.facing * 18, my = head.position.y + 2;
+      for (let k = 0; k < 4; k++) {
+        flames.push({
+          x: mx, y: my,
+          vx: lz.facing * rand(4, 7.5) + rand(-0.6, 0.6),
+          vy: rand(-1.2, 0.6),
+          r: rand(4, 8), life: rand(26, 44), srcId: id,
+        });
+      }
+      if (Math.random() < 0.3) spawnSmoke(mx + lz.facing * 20, my - 6, rand(3, 5));
+      Body.applyForce(torso, torso.position, { x: -lz.facing * 0.002 * torso.mass, y: 0 });
+      continue;
+    }
+
+    if (!lz.standing) continue;
+    const prey = [...dummies.values()].filter(d =>
+      (d.kind === 'human' || d.kind === 'duck' || d.kind === 'monster') && !d.dead);
+    if (prey.length === 0) continue;
+
+    let nearest = null, bestD = Infinity;
+    for (const t of prey) {
+      const tt = t.limbs.torso;
+      const dd = Math.hypot(tt.position.x - torso.position.x, tt.position.y - torso.position.y);
+      if (dd < bestD) { bestD = dd; nearest = t; }
+    }
+    if (!nearest) continue;
+
+    const dx = nearest.limbs.torso.position.x - torso.position.x;
+    if (Math.abs(dx) > 10) lz.facing = Math.sign(dx);
+
+    if (bestD > 200) {
+      // Speed-capped stalk: an uncapped charge hits hard enough to blow
+      // up the bug's constraint solver.
+      if (Math.abs(torso.velocity.x) < 4.5) {
+        Body.applyForce(torso, torso.position, { x: lz.facing * 0.009 * torso.mass, y: 0 });
+      }
+    } else if (now > lz.breathReadyAt) {
+      lz.breathUntil = now + 1400;
+      lz.breathReadyAt = now + 4400;
+      log('The lizard draws breath.', 'hint');
+    }
+  }
+});
+
+// Lizard render: eye, dorsal spikes, flicking tongue
+Events.on(render, 'afterRender', () => {
+  const ctx = render.context;
+  const now = performance.now();
+  for (const lz of dummies.values()) {
+    if (lz.kind !== 'lizard') continue;
+    const head = lz.limbs.head, torso = lz.limbs.torso;
+    const f = lz.facing || 1;
+    // Dorsal spikes along the back
+    ctx.save();
+    ctx.translate(torso.position.x, torso.position.y);
+    ctx.rotate(torso.angle);
+    ctx.fillStyle = lz.dead ? '#2c3a1c' : '#33491e';
+    for (let k = -2; k <= 2; k++) {
+      ctx.beginPath();
+      ctx.moveTo(k * 13 - 5, -14);
+      ctx.lineTo(k * 13, -23);
+      ctx.lineTo(k * 13 + 5, -14);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.restore();
+    // Head details
+    ctx.save();
+    ctx.translate(head.position.x, head.position.y);
+    ctx.rotate(head.angle);
+    ctx.scale(f, 1);
+    // Eye: slit pupil, glows while breathing
+    const breathing = now < lz.breathUntil;
+    ctx.beginPath();
+    ctx.arc(2, -5, 4, 0, Math.PI * 2);
+    ctx.fillStyle = lz.dead ? '#3a3a2c' : breathing ? '#ffb030' : '#d8c040';
+    ctx.fill();
+    if (!lz.dead) {
+      ctx.fillStyle = '#181410';
+      ctx.fillRect(1.2, -8, 1.6, 6);
+    }
+    // Nostril + jawline
+    ctx.fillStyle = '#22301a';
+    ctx.beginPath(); ctx.arc(12, -2, 1.3, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#33491e';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(4, 5); ctx.lineTo(13, 3); ctx.stroke();
+    // Tongue flick when idle
+    if (!lz.dead && !breathing && Math.sin(now / 400) > 0.92) {
+      ctx.strokeStyle = '#c44a4a';
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.moveTo(15, 1);
+      ctx.lineTo(24, -1);
+      ctx.lineTo(27, -4);
+      ctx.moveTo(24, -1);
+      ctx.lineTo(27, 1);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+});
+
+// ---------- Sprinkler ----------
+// Pops up from the lawn and sweeps a high-pressure jet back and forth.
+
+function startSprinkler() {
+  sprinklers.push({ x: rand(W * 0.25, W * 0.75), born: performance.now(), life: 6500 });
+  log('Sprinkler hiss.', 'hint');
+}
+
+Events.on(engine, 'beforeUpdate', () => {
+  if (sprinklers.length === 0) return;
+  const now = performance.now();
+  for (let i = sprinklers.length - 1; i >= 0; i--) {
+    const s = sprinklers[i];
+    if (now - s.born > s.life) { sprinklers.splice(i, 1); continue; }
+    const ang = -Math.PI / 2 + Math.sin(now / 700 + s.born) * 1.0;
+    const jx = Math.cos(ang), jy = Math.sin(ang);
+    const nx = s.x, ny = H - 14;
+    // Push bodies caught in the jet
+    for (const body of Composite.allBodies(engine.world)) {
+      if (body.isStatic || frozenIds.has(body.id)) continue;
+      const dx = body.position.x - nx, dy = body.position.y - ny;
+      const dist = Math.hypot(dx, dy);
+      if (dist < 12 || dist > 470) continue;
+      const da = Math.abs(Math.atan2(dy, dx) - ang);
+      if (Math.min(da, Math.PI * 2 - da) > 0.14) continue;
+      const fall = 1 - dist / 470;
+      Body.applyForce(body, body.position, { x: jx * 0.005 * body.mass * fall, y: jy * 0.005 * body.mass * fall });
+    }
+    // Spray particles
+    for (let k = 0; k < 5; k++) {
+      const sp = rand(8, 12);
+      waterDrops.push({
+        x: nx, y: ny,
+        vx: jx * sp + rand(-0.7, 0.7),
+        vy: jy * sp + rand(-0.7, 0.7),
+        life: rand(40, 70),
+      });
+    }
+    if (waterDrops.length > 400) waterDrops.splice(0, waterDrops.length - 400);
+  }
+});
+
+// ---------- Magnifying Glass ----------
+// A focused sunbeam wanders to the nearest creature and lingers. Linger
+// long enough and they ignite.
+
+function startMagnify() {
+  sunbeams.push({ x: rand(W * 0.2, W * 0.8), y: rand(40, H * 0.4), born: performance.now(), life: 8000, heat: 0 });
+  log('Someone found a magnifying glass.', 'hint');
+}
+
+Events.on(engine, 'beforeUpdate', () => {
+  if (sunbeams.length === 0) return;
+  const now = performance.now();
+  for (let i = sunbeams.length - 1; i >= 0; i--) {
+    const sb = sunbeams[i];
+    if (now - sb.born > sb.life) { sunbeams.splice(i, 1); continue; }
+
+    let target = null, bestD = Infinity;
+    for (const d of dummies.values()) {
+      if (d.dead || d.kind === 'lizard') continue;
+      const t = d.limbs.torso;
+      const dd = Math.hypot(t.position.x - sb.x, t.position.y - sb.y);
+      if (dd < bestD) { bestD = dd; target = d; }
+    }
+    if (!target) { sb.y += Math.sin(now / 500) * 0.6; continue; }
+
+    const t = target.limbs.torso;
+    const dx = t.position.x - sb.x, dy = t.position.y - sb.y;
+    const dd = Math.hypot(dx, dy) || 1;
+    const step = Math.min(3.2, dd * 0.06);
+    sb.x += (dx / dd) * step;
+    sb.y += (dy / dd) * step;
+
+    if (dd < 26) {
+      sb.heat += 16.7;
+      if (Math.random() < 0.25) spawnSmoke(sb.x + rand(-3, 3), sb.y - 4, rand(1.5, 3));
+      if (sb.heat > 650) {
+        igniteDummy(target, 3500);
+        log('Ignition.', 'hint');
+        sb.heat = -500; // cool-down before it can re-ignite
+      }
+    } else {
+      sb.heat = Math.max(0, sb.heat - 8);
+    }
+  }
+});
+
+// ---------- Lawnmower ----------
+// The apex hazard. Rolls in from one side at deck height; anything made
+// of flesh that meets the blade is shredded instantly. Mulches poop too.
+
+function launchMower() {
+  const dir = Math.random() < 0.5 ? 1 : -1;
+  // Spawn flush with the stage edge — any deeper and the thick walls
+  // catapult it across the stage during overlap resolution.
+  const x = dir > 0 ? 50 : W - 50;
+  const m = Bodies.rectangle(x, H - 30, 96, 40, {
+    density: 0.05, friction: 0.1, frictionAir: 0,
+    render: { visible: false },
+    label: 'mower',
+  });
+  m.mowerData = { dir };
+  mowers.push(m);
+  World.add(engine.world, m);
+  for (let k = 0; k < 5; k++) spawnSmoke(x - dir * rand(10, 40), H - rand(20, 50), rand(4, 7));
+  log('Mower day. Run.', 'hint');
+}
+
+Events.on(engine, 'beforeUpdate', () => {
+  if (mowers.length === 0) return;
+  const worldBodies = Composite.allBodies(engine.world);
+  for (let i = mowers.length - 1; i >= 0; i--) {
+    const m = mowers[i];
+    if (!worldBodies.includes(m)) { mowers.splice(i, 1); continue; }
+    const dir = m.mowerData.dir;
+    // The side walls are solid — despawn on contact, behind a puff of exhaust
+    if ((dir > 0 && m.position.x > W - 52) || (dir < 0 && m.position.x < 52)) {
+      for (let k = 0; k < 5; k++) spawnSmoke(m.position.x + rand(-20, 20), m.position.y - rand(0, 24), rand(4, 7));
+      Composite.remove(engine.world, m);
+      mowers.splice(i, 1);
+      continue;
+    }
+    Body.setVelocity(m, { x: dir * 5, y: m.velocity.y });
+    Body.setAngle(m, 0);
+    Body.setAngularVelocity(m, 0);
+
+    // Blade zone: ahead of the deck, at grass height
+    const bx = m.position.x + dir * 30;
+    for (const body of worldBodies) {
+      if (body.isStatic || body === m) continue;
+      if (Math.abs(body.position.x - bx) > 45 || body.position.y < H - 75) continue;
+      if (body.label === 'flesh') {
+        const d = dummies.get(body.dummyId);
+        if (d && !d.dead) {
+          d.damage = 999;
+          spurt(body.position.x, body.position.y, 14, dir, -1.2);
+          spurt(body.position.x, body.position.y - 10, 12, -dir * 0.4, -1);
+          addDecal(body.position.x, body.position.y, 10);
+          dismember(d);
+        }
+        Body.setVelocity(body, { x: dir * rand(-3, 9), y: -rand(7, 15) });
+      } else if (body.label === 'poop') {
+        // You knew this would happen
+        for (let k = 0; k < 22; k++) {
+          droplets.push({
+            x: body.position.x, y: body.position.y,
+            vx: rand(-5, 5) + dir * 3, vy: -rand(2, 9),
+            r: rand(2, 4), color: pick(['#5a3a1e', '#4c3018', '#6a4626']),
+            life: rand(40, 80),
+          });
+        }
+        decals.push({ x: body.position.x, y: H - 6, r: rand(10, 16), color: '#4c3018', alpha: 0.7 });
+        Composite.remove(engine.world, body);
+        log('Oh no. The poop.', 'hint');
+      }
+    }
+    // Clippings + exhaust
+    for (let k = 0; k < 3; k++) {
+      grassBits.push({
+        x: m.position.x - dir * rand(20, 48), y: H - rand(8, 30),
+        vx: -dir * rand(1, 4), vy: -rand(3, 8),
+        life: rand(25, 50),
+      });
+    }
+    if (grassBits.length > 220) grassBits.splice(0, grassBits.length - 220);
+    if (Math.random() < 0.3) spawnSmoke(m.position.x - dir * 40, m.position.y - 26, rand(2.5, 4.5));
+  }
+});
+
+// Mower render: deck, engine, handle, wheels, blade blur
+Events.on(render, 'afterRender', () => {
+  if (mowers.length === 0) return;
+  const ctx = render.context;
+  const now = performance.now();
+  for (const m of mowers) {
+    const dir = m.mowerData.dir;
+    const { x, y } = m.position;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(dir, 1);
+    // Blade blur under the deck
+    ctx.fillStyle = `rgba(60,60,70,${0.35 + 0.25 * Math.sin(now / 18)})`;
+    ctx.beginPath();
+    ctx.ellipse(14, 16, 34, 5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Deck
+    ctx.fillStyle = '#b03020';
+    ctx.strokeStyle = '#5a1410';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.roundRect(-44, -6, 88, 22, 6);
+    ctx.fill();
+    ctx.stroke();
+    // Engine block
+    ctx.fillStyle = '#6a6e74';
+    ctx.beginPath();
+    ctx.roundRect(-16, -24, 32, 20, 4);
+    ctx.fill();
+    ctx.fillStyle = '#3a3e44';
+    ctx.fillRect(-6, -30, 12, 7);
+    // Handle, slanting back
+    ctx.strokeStyle = '#2a2e34';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(-38, -4);
+    ctx.lineTo(-78, -52);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(-78, -52);
+    ctx.lineTo(-92, -52);
+    ctx.stroke();
+    // Wheels
+    const roll = (x / 11) * dir;
+    for (const wx of [-32, 34]) {
+      ctx.beginPath();
+      ctx.arc(wx, 18, 11, 0, Math.PI * 2);
+      ctx.fillStyle = '#1c1e22';
+      ctx.fill();
+      ctx.strokeStyle = '#4a4e54';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(wx, 18);
+      ctx.lineTo(wx + Math.cos(roll) * 8, 18 + Math.sin(roll) * 8);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+});
+
+// ---------- Yard ambience: dusk light, grass, pollen, fireflies ----------
+// Plus the yard's particle systems (flames, smoke, water, clippings).
+
+const GRASS_BACK = Array.from({ length: 16 }, (_, i) => ({
+  x: (i + rand(0.1, 0.9)) / 16, h: rand(90, 240), w: rand(10, 18),
+  ph: rand(0, Math.PI * 2), tone: rand(0, 1),
+}));
+const GRASS_FRONT = Array.from({ length: 6 }, () => ({
+  x: Math.random() < 0.5 ? rand(0, 0.2) : rand(0.8, 1), h: rand(160, 300), w: rand(14, 24),
+  ph: rand(0, Math.PI * 2), tone: rand(0, 1),
+}));
+const pollen = Array.from({ length: 30 }, () => ({
+  x: Math.random(), y: Math.random(), r: rand(0.7, 1.8), v: rand(0.00006, 0.0002),
+}));
+const fireflies = Array.from({ length: 7 }, () => ({
+  x: Math.random(), y: rand(0.2, 0.8), ph: rand(0, Math.PI * 2), sp: rand(0.6, 1.4),
+}));
+
+function drawGrassBlade(ctx, gx, h, w, sway, color) {
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(gx - w / 2, H);
+  ctx.quadraticCurveTo(gx - w * 0.2, H - h * 0.55, gx + sway, H - h);
+  ctx.quadraticCurveTo(gx + w * 0.25, H - h * 0.5, gx + w / 2, H);
+  ctx.closePath();
+  ctx.fill();
+}
+
+Events.on(render, 'afterRender', () => {
+  if (state.world !== 'yard') return;
+  const ctx = render.context;
+  const now = performance.now();
+
+  // Dusk sky: warm glow up top, deep green settling below
+  const sky = ctx.createLinearGradient(0, 0, 0, H);
+  sky.addColorStop(0, 'rgba(255,170,70,0.10)');
+  sky.addColorStop(0.45, 'rgba(120,90,30,0.03)');
+  sky.addColorStop(1, 'rgba(10,30,5,0.12)');
+  ctx.fillStyle = sky;
+  ctx.fillRect(0, 0, W, H);
+
+  // Low sun, top-right
+  const sun = ctx.createRadialGradient(W * 0.85, H * 0.1, 0, W * 0.85, H * 0.1, 90);
+  sun.addColorStop(0, 'rgba(255,210,120,0.35)');
+  sun.addColorStop(1, 'rgba(255,210,120,0)');
+  ctx.fillStyle = sun;
+  ctx.beginPath();
+  ctx.arc(W * 0.85, H * 0.1, 90, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Background grass
+  for (const g of GRASS_BACK) {
+    const sway = Math.sin(now / 1600 + g.ph) * 8;
+    drawGrassBlade(ctx, g.x * W, g.h, g.w, sway, `rgba(${26 + g.tone * 14 | 0},${52 + g.tone * 16 | 0},${16 + g.tone * 8 | 0},0.32)`);
+  }
+
+  // Pollen, drifting up and left
+  ctx.fillStyle = 'rgba(235,225,150,0.22)';
+  for (const m of pollen) {
+    m.x -= m.v; m.y -= m.v * 0.7;
+    if (m.x < 0) m.x = 1;
+    if (m.y < 0) m.y = 1;
+    ctx.beginPath();
+    ctx.arc(m.x * W, m.y * H, m.r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Fireflies, blinking
+  for (const ff of fireflies) {
+    const fx = (ff.x + Math.sin(now / 4000 * ff.sp + ff.ph) * 0.06) * W;
+    const fy = (ff.y + Math.cos(now / 5200 * ff.sp + ff.ph * 2) * 0.05) * H;
+    const blink = Math.max(0, Math.sin(now / 800 + ff.ph * 3));
+    if (blink < 0.25) continue;
+    const glow = ctx.createRadialGradient(fx, fy, 0, fx, fy, 7);
+    glow.addColorStop(0, `rgba(200,255,120,${0.7 * blink})`);
+    glow.addColorStop(1, 'rgba(200,255,120,0)');
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(fx, fy, 7, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Sprinkler hardware + spray
+  for (const s of sprinklers) {
+    ctx.fillStyle = '#2a4a20';
+    ctx.fillRect(s.x - 5, H - 18, 10, 18);
+    ctx.fillStyle = '#3a5a2c';
+    ctx.fillRect(s.x - 7, H - 22, 14, 5);
+  }
+  ctx.fillStyle = 'rgba(150,200,240,0.7)';
+  for (let i = waterDrops.length - 1; i >= 0; i--) {
+    const wd = waterDrops[i];
+    wd.vy += 0.3;
+    wd.x += wd.vx; wd.y += wd.vy;
+    wd.life -= 1;
+    if (wd.life <= 0 || wd.y > H - 4) { waterDrops.splice(i, 1); continue; }
+    ctx.beginPath();
+    ctx.arc(wd.x, wd.y, 1.6, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Grass clippings
+  ctx.fillStyle = 'rgba(90,160,50,0.8)';
+  for (let i = grassBits.length - 1; i >= 0; i--) {
+    const gb = grassBits[i];
+    gb.vy += 0.3;
+    gb.x += gb.vx; gb.y += gb.vy;
+    gb.life -= 1;
+    if (gb.life <= 0 || gb.y > H - 2) { grassBits.splice(i, 1); continue; }
+    ctx.fillRect(gb.x, gb.y, 3, 1.5);
+  }
+
+  // Sunbeam focal points + floating magnifier
+  for (const sb of sunbeams) {
+    // Light shaft from the sun to the focal point
+    ctx.strokeStyle = 'rgba(255,230,150,0.13)';
+    ctx.lineWidth = 26;
+    ctx.beginPath();
+    ctx.moveTo(W * 0.85, H * 0.1);
+    ctx.lineTo(sb.x, sb.y);
+    ctx.stroke();
+    // Focal dot
+    const hot = sb.heat > 0 ? Math.min(1, sb.heat / 650) : 0;
+    const core = ctx.createRadialGradient(sb.x, sb.y, 0, sb.x, sb.y, 10 + hot * 6);
+    core.addColorStop(0, `rgba(255,255,230,${0.85})`);
+    core.addColorStop(0.4, `rgba(255,220,120,${0.5 + hot * 0.4})`);
+    core.addColorStop(1, 'rgba(255,200,80,0)');
+    ctx.fillStyle = core;
+    ctx.beginPath();
+    ctx.arc(sb.x, sb.y, 10 + hot * 6, 0, Math.PI * 2);
+    ctx.fill();
+    // The lens itself, hovering above
+    const lx = sb.x - 30, ly = sb.y - 46;
+    ctx.strokeStyle = '#8a6a3a';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.arc(lx, ly, 17, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(200,230,250,0.18)';
+    ctx.beginPath();
+    ctx.arc(lx, ly, 15, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#6a4a24';
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    ctx.moveTo(lx - 13, ly - 13);
+    ctx.lineTo(lx - 28, ly - 28);
+    ctx.stroke();
+  }
+
+  // Foreground grass: brighter, drawn over everything for depth
+  for (const g of GRASS_FRONT) {
+    const sway = Math.sin(now / 1400 + g.ph) * 10;
+    drawGrassBlade(ctx, g.x * W, g.h, g.w, sway, `rgba(${38 + g.tone * 14 | 0},${78 + g.tone * 18 | 0},${22 + g.tone * 8 | 0},0.5)`);
+  }
+});
+
+// Flames + smoke render in every world (fires can outlive a hazard)
+Events.on(render, 'afterRender', () => {
+  const ctx = render.context;
+  for (const f of flames) {
+    const a = Math.min(0.85, f.life / 25);
+    const grad = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, f.r);
+    grad.addColorStop(0, `rgba(255,235,150,${a})`);
+    grad.addColorStop(0.5, `rgba(255,140,40,${a * 0.8})`);
+    grad.addColorStop(1, 'rgba(200,60,20,0)');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(f.x, f.y, f.r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  for (let i = smokes.length - 1; i >= 0; i--) {
+    const s = smokes[i];
+    s.x += s.vx; s.y += s.vy;
+    s.r += 0.1;
+    s.life -= 1;
+    if (s.life <= 0) { smokes.splice(i, 1); continue; }
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(70,70,75,${Math.min(0.4, s.life / 90)})`;
+    ctx.fill();
+  }
+});
+
 // ====================================================================
 // ---------- PERSISTENCE ----------
 // Progress (unlocks, solves, tokens, proficiency, last world) survives
@@ -3969,7 +5331,7 @@ function loadState() {
     if (typeof s.skips === 'number') state.skips = s.skips;
     if (typeof s.correctStreak === 'number') state.correctStreak = s.correctStreak;
     if (s.levelCorrect) {
-      for (const k of [1, 2, 3, 4, 5]) {
+      for (const k of [1, 2, 3, 4, 5, 6]) {
         if (typeof s.levelCorrect[k] === 'number') state.levelCorrect[k] = s.levelCorrect[k];
       }
     }
@@ -3991,7 +5353,7 @@ document.getElementById('reset-save').addEventListener('click', (e) => {
 // ---------- World 2 + 3 + persistence boot ----------
 
 const savedWorld = loadState();
-const hadSave = state.solved > 0 || state.unlocked.size > 4;
+const hadSave = state.solved > 0 || state.unlocked.size > 5;
 renderToolbar();
 renderWorldTabs();
 refreshHUD();

@@ -1,7 +1,7 @@
 // Calculus Carnage service worker — cache-first so the game works offline
 // once installed. Bump CACHE version when shipping changes.
 
-const CACHE = 'calculus-carnage-v4';
+const CACHE = 'calculus-carnage-v5';
 const ASSETS = [
   '.',
   'index.html',
