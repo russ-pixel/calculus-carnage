@@ -1438,6 +1438,7 @@ function onToolClick(t) {
   }
   state.tool = t.id;
   renderToolbar();
+  saveState();
 }
 
 // ---------- Math gate ----------
@@ -1506,6 +1507,7 @@ function submitAnswer() {
     log(`Unlocked: ${tool.label} (${p.text})`, 'solve');
     refreshHUD();
     refreshProficiency();
+    saveState();
     setTimeout(() => {
       closeMathGate();
       renderToolbar();
@@ -1567,6 +1569,7 @@ function useSkip() {
   state.unlocked.add(tool.id);
   log(`Skipped: ${tool.label} (used token)`, 'solve');
   refreshHUD();
+  saveState();
   closeMathGate();
   renderToolbar();
   renderWorldTabs();
@@ -2149,6 +2152,7 @@ function switchWorld(id) {
     spawnDummy(W * 0.7, H - 140);
     log('Surfacing.', 'solve');
   }
+  saveState();
 }
 
 // ---------- Water physics ----------
@@ -3925,6 +3929,74 @@ document.getElementById('panel-toggle').addEventListener('click', () => {
   requestAnimationFrame(() => rebuildWalls());
 });
 
-// ---------- World 2 + 3 boot ----------
+// ====================================================================
+// ---------- PERSISTENCE ----------
+// Progress (unlocks, solves, tokens, proficiency, last world) survives
+// reload via localStorage. Wrapped in try/catch so private browsing or
+// blocked storage just means a fresh session, never a crash.
+// ====================================================================
 
+const SAVE_KEY = 'calculus-carnage-save-v1';
+
+function saveState() {
+  try {
+    localStorage.setItem(SAVE_KEY, JSON.stringify({
+      solved: state.solved,
+      skips: state.skips,
+      correctStreak: state.correctStreak,
+      levelCorrect: state.levelCorrect,
+      unlocked: [...state.unlocked],
+      world: state.world,
+      tool: state.tool,
+    }));
+  } catch (e) { /* storage unavailable — play on without saving */ }
+}
+
+// Returns the saved world id (to restore last) or null.
+function loadState() {
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (!raw) return null;
+    const s = JSON.parse(raw);
+    const validIds = new Set([
+      ...TOOLS.map(t => t.id),
+      ...WORLDS.filter(w => w.gate).map(w => w.gate.id),
+    ]);
+    if (Array.isArray(s.unlocked)) {
+      for (const id of s.unlocked) if (validIds.has(id)) state.unlocked.add(id);
+    }
+    if (typeof s.solved === 'number') state.solved = s.solved;
+    if (typeof s.skips === 'number') state.skips = s.skips;
+    if (typeof s.correctStreak === 'number') state.correctStreak = s.correctStreak;
+    if (s.levelCorrect) {
+      for (const k of [1, 2, 3, 4, 5]) {
+        if (typeof s.levelCorrect[k] === 'number') state.levelCorrect[k] = s.levelCorrect[k];
+      }
+    }
+    if (state.unlocked.has(s.tool) && TOOLS.some(t => t.id === s.tool)) state.tool = s.tool;
+    return WORLDS.some(w => w.id === s.world) ? s.world : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+// Reset link in the sidebar
+document.getElementById('reset-save').addEventListener('click', (e) => {
+  e.preventDefault();
+  if (!confirm('Wipe all progress — unlocks, solves, and skip tokens?')) return;
+  try { localStorage.removeItem(SAVE_KEY); } catch (err) {}
+  location.reload();
+});
+
+// ---------- World 2 + 3 + persistence boot ----------
+
+const savedWorld = loadState();
+const hadSave = state.solved > 0 || state.unlocked.size > 4;
+renderToolbar();
 renderWorldTabs();
+refreshHUD();
+refreshProficiency();
+if (savedWorld && savedWorld !== state.world) {
+  switchWorld(savedWorld); // re-renders + reseeds the stage
+}
+if (hadSave) log('Progress restored.', 'solve');

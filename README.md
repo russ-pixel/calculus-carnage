@@ -144,7 +144,7 @@ Wings, eyes, tentacles, blood, fire, etc. are drawn procedurally in `afterRender
 
 ## Not yet implemented (contribution wishlist)
 
-- Persistence (localStorage). Reload resets unlocks.
+- ~~Persistence (localStorage).~~ Shipped: unlocks, solves, tokens, proficiency, and last world survive reload (`SAVE_KEY` in main.js; "reset" link in the sidebar wipes it).
 - Wound-decal textures on living dummies.
 - Custom-execution / fatality builder.
 - Tier-based content scaling per the original design doc.
