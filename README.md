@@ -1,6 +1,8 @@
 # Calculus Carnage — Prototype
 
-Browser physics-sandbox where every unlock is gated behind an algebra problem. Adult tone, no condescension, 3-tier hint system. Single-file HTML + Matter.js (CDN), no build. Two worlds: **Surface** and **The Abyss** (underwater, gated behind a Level 4 problem).
+**▶ Play it now: https://russ-pixel.github.io/calculus-carnage/** (works on phones — add to home screen for the app experience)
+
+Browser physics-sandbox where every unlock is gated behind an algebra problem. Adult tone, no condescension, 3-tier hint system. Plain HTML + JS + Matter.js, **no build step, no dependencies**. Three worlds: **Surface**, **The Abyss** (underwater, gated behind Level 4), and **Mars** (0.38g, gated behind Level 5).
 
 ## Run
 
@@ -8,7 +10,19 @@ Browser physics-sandbox where every unlock is gated behind an algebra problem. A
 open index.html
 ```
 
-Reload with ⌘R. No server, no dependencies to install.
+Reload with ⌘R. No server, no install — it's just a static page. (For service-worker/PWA testing, serve it: `python3 -m http.server`.)
+
+## Contributing
+
+PRs welcome — this is the easiest codebase you'll ever set up: clone, open `index.html`, edit, reload.
+
+1. Fork → edit → open a pull request against `main`.
+2. **Read the architecture notes below first** — new characters should reuse the `dummies` Map + `kind` conventions, new tools go in `TOOLS` + `placeAt` + `onToolClick`.
+3. Keep the math-gate tone: adult, no "wrong"/"easy" copy, no timers.
+4. Test in both worlds and at phone width (resize your browser narrow) — the Abyss has buoyancy/drag that changes how everything behaves.
+5. If your change ships, `sw.js`'s `CACHE` version gets bumped on merge so installed PWAs update.
+
+Good first contributions: new creatures (see how `spawnAngler` does it in ~60 lines + a render handler), new weapons, new math problem types (`makeProblem`), localStorage persistence (top of the wishlist below).
 
 ## How to play
 
@@ -37,6 +51,19 @@ Reload with ⌘R. No server, no dependencies to install.
 | Mutant Duck | 3 | spawn | Aggressive AI character — waddles + lunges at humans/monsters. Both worlds (floats underwater). |
 | Parasite | 3 | spawn | Headcrab visual. Latches onto a human, transforms host into a tentacled monster over 3s. Monster hunts non-monsters; on death erupts into 2 new parasites. |
 | Laser Shark | 3 | spawn | Hovers at spawn height, drifts toward nearest human/duck/monster. Fires a green laser beam every 2.5s (0.8s duration). Two beams dismember. Darkens when wounded. Both worlds. |
+
+## Tools — Mars
+
+The world is gated behind a **Level 5** problem (`a(x + b) = c`, distributive, Grade 8). Real Mars gravity (0.38g) — everything jumps higher and falls slower. Ambience: rust sky, Phobos + Deimos creeping overhead, drifting dust.
+
+| Tool | Level | Kind | Notes |
+|---|---|---|---|
+| Astronaut | 0 | spawn | Default unlocked. Dummy skeleton in a white EVA suit + glass dome. **Suit breach mechanic**: >10 total damage punctures the suit — air vents, red warning blinks, and 8s later they quietly asphyxiate (grey, fogged helmet, no gore). |
+| Oxygen Tank | 2 | spawn | Pressurized canister. Hard impact / bullet / meteor punctures it → 2.5s of unguided rocket thrust, then explodes. |
+| Grey Alien | 3 | spawn | Small ragdoll, big head, black almond eyes. Walks toward victims; within 170px telekinetically lifts them for ~1s (purple aura), then hurls them across the stage. |
+| Meteor Shower | 3 | action | 3s of flaming rocks from the top. Explode on first contact, leave scorch marks. |
+| Dust Storm | 4 | action | 6s screen-wide lateral wind with rust haze + streaks. Knocks ragdolls over. |
+| UFO Abduction | 5 | action | Saucer sweeps the sky with a green tractor beam. Bodies in the cone float up; whatever reaches the hull is taken. |
 
 ## Tools — The Abyss
 
@@ -105,7 +132,7 @@ Walls were thickened from 60px → 240px to stop high-speed bodies (bullets, lun
 
 ### Math gate
 
-`makeProblem(level)` → `{ text, answer, level, method }`. Tier-3 hint *replaces* the current problem with a fresh structurally-identical one (so the player applies the method instead of copying the answer). Levels: 1 = `x ± a = b`, 2 = `ax = b` / `x÷a = b`, 3 = `ax + b = c`, 4 = `ax + b = cx + d`.
+`makeProblem(level)` → `{ text, answer, level, method }`. Tier-3 hint *replaces* the current problem with a fresh structurally-identical one (so the player applies the method instead of copying the answer). Levels: 1 = `x ± a = b`, 2 = `ax = b` / `x÷a = b`, 3 = `ax + b = c`, 4 = `ax + b = cx + d`, 5 = `a(x + b) = c`.
 
 ### Visual flourishes
 
@@ -115,9 +142,16 @@ Wings, eyes, tentacles, blood, fire, etc. are drawn procedurally in `afterRender
 
 - A fire-breathing dragon was added and later removed (Dec 2025 build). Code path included `breatheFire`, `fireParticles`, dragon AI, dragon fire-immunity carve-out, `DRAGON_SCALE` constant. All deleted — `git diff` would show the cleanup if this were in git.
 
-## Not yet implemented
+## Not yet implemented (contribution wishlist)
 
 - Persistence (localStorage). Reload resets unlocks.
 - Wound-decal textures on living dummies.
 - Custom-execution / fatality builder.
 - Tier-based content scaling per the original design doc.
+- ~~World 3? (Space — zero-g, meteors, alien abduction beam…)~~ Shipped: Mars.
+- World 4? (Volcano — lava floor, fire imps, eruptions…)
+- Sound effects.
+
+## License
+
+MIT — see [LICENSE](LICENSE).

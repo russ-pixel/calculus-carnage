@@ -9,8 +9,8 @@ const state = {
   solved: 0,
   skips: 0,
   correctStreak: 0,
-  levelCorrect: { 1: 0, 2: 0, 3: 0, 4: 0 },
-  unlocked: new Set(['spawn-box', 'spawn-dummy', 'spawn-diver']), // default tools
+  levelCorrect: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+  unlocked: new Set(['spawn-box', 'spawn-dummy', 'spawn-diver', 'spawn-astro']), // default tools
   pendingUnlock: null,                  // tool id awaiting math gate
   currentProblem: null,
   hintTier: 0,
@@ -46,14 +46,23 @@ const TOOLS = [
   { id: 'harpoon',       label: 'Harpoon Volley', level: 4, kind: 'action', action: 'harpoon', world: 'abyss' },
   { id: 'whirlpool',     label: 'Whirlpool',     level: 4, kind: 'action', action: 'whirlpool', world: 'abyss' },
   { id: 'kraken',        label: 'Kraken',        level: 4, kind: 'action', action: 'kraken', world: 'abyss' },
+  // --- Mars ---
+  { id: 'spawn-astro',   label: 'Astronaut',     level: 0, kind: 'spawn',  spawn: 'astro',   world: 'mars' },
+  { id: 'spawn-tank',    label: 'Oxygen Tank',   level: 2, kind: 'spawn',  spawn: 'tank',    world: 'mars' },
+  { id: 'spawn-alien',   label: 'Grey Alien',    level: 3, kind: 'spawn',  spawn: 'alien',   world: 'mars' },
+  { id: 'meteor-shower', label: 'Meteor Shower', level: 3, kind: 'action', action: 'meteors', world: 'mars' },
+  { id: 'dust-storm',    label: 'Dust Storm',    level: 4, kind: 'action', action: 'storm',  world: 'mars' },
+  { id: 'ufo',           label: 'UFO Abduction', level: 5, kind: 'action', action: 'ufo',    world: 'mars' },
 ];
 
-// Worlds. Each world filters the toolbar and restyles the stage. The Abyss
-// is itself math-gated — its tab behaves like a locked tool until solved.
+// Worlds. Each world filters the toolbar and restyles the stage. Locked
+// worlds are math-gated — their tab behaves like a locked tool until solved.
 const ABYSS_GATE = { id: 'world-abyss', label: 'The Abyss', level: 4, onUnlock: () => switchWorld('abyss') };
+const MARS_GATE  = { id: 'world-mars',  label: 'Mars',      level: 5, onUnlock: () => switchWorld('mars') };
 const WORLDS = [
-  { id: 'surface', label: 'Surface',   bg: '#0a0c10', wall: '#1a1f26' },
-  { id: 'abyss',   label: 'The Abyss', bg: '#03111d', wall: '#0c2231', gate: ABYSS_GATE },
+  { id: 'surface', label: 'Surface',   bg: '#0a0c10', wall: '#1a1f26', gravity: 1 },
+  { id: 'abyss',   label: 'The Abyss', bg: '#03111d', wall: '#0c2231', gravity: 1, gate: ABYSS_GATE },
+  { id: 'mars',    label: 'Mars',      bg: '#1c0d07', wall: '#4a2418', gravity: 0.38, gate: MARS_GATE },
 ];
 
 // ---------- Problem generator ----------
@@ -112,22 +121,38 @@ function makeProblem(level) {
         `Step 2 — divide by ${a}: x = ${(c - b) / a}.`,
     };
   }
-  // Level 4: ax + b = cx + d — variable on both sides (whole-number solution)
-  const x = randInt(2, 12);
-  const a = randInt(3, 9);
-  const c = randInt(1, a - 1);
-  const b = randInt(2, 15);
-  const d = (a - c) * x + b;
-  const k = a - c;
-  const kx = k === 1 ? 'x' : `${k}x`;
-  const lastStep = k === 1 ? '' : ` Step 3 — divide by ${k}: x = ${x}.`;
+  if (level === 4) {
+    // Level 4: ax + b = cx + d — variable on both sides (whole-number solution)
+    const x = randInt(2, 12);
+    const a = randInt(3, 9);
+    const c = randInt(1, a - 1);
+    const b = randInt(2, 15);
+    const d = (a - c) * x + b;
+    const k = a - c;
+    const kx = k === 1 ? 'x' : `${k}x`;
+    const lastStep = k === 1 ? '' : ` Step 3 — divide by ${k}: x = ${x}.`;
+    return {
+      text: `${a}x + ${b} = ${c}x + ${d}`,
+      answer: x,
+      level: 4,
+      method:
+        `Step 1 — subtract ${c}x from both sides: ${kx} + ${b} = ${d}. ` +
+        `Step 2 — subtract ${b}: ${kx} = ${d - b}.` + lastStep,
+    };
+  }
+  // Level 5: a(x + b) = c — distributive property (whole-number solution)
+  const x = randInt(2, 10);
+  const a = randInt(2, 6);
+  const b = randInt(1, 9);
+  const c = a * (x + b);
   return {
-    text: `${a}x + ${b} = ${c}x + ${d}`,
+    text: `${a}(x + ${b}) = ${c}`,
     answer: x,
-    level: 4,
+    level: 5,
     method:
-      `Step 1 — subtract ${c}x from both sides: ${kx} + ${b} = ${d}. ` +
-      `Step 2 — subtract ${b}: ${kx} = ${d - b}.` + lastStep,
+      `Step 1 — divide both sides by ${a}: x + ${b} = ${c / a}. ` +
+      `Step 2 — subtract ${b}: x = ${x}. ` +
+      `(Or distribute first: ${a}x + ${a * b} = ${c}, then solve as a two-step.)`,
   };
 }
 
@@ -837,6 +862,8 @@ Events.on(render, 'afterRender', () => {
     const p = droplets[i];
     if (state.world === 'abyss') {
       p.vy += 0.08; p.vx *= 0.97; p.vy *= 0.97;  // blood drifts in water
+    } else if (state.world === 'mars') {
+      p.vy += 0.13;          // 0.38g
     } else {
       p.vy += 0.35;          // gravity
     }
@@ -1348,6 +1375,9 @@ function placeAt(x, y) {
     case 'piranhas': spawnPiranhas(x, y); break;
     case 'angler':   spawnAngler(x, y); break;
     case 'eel':      spawnEel(x, y); break;
+    case 'astro':    spawnAstro(x, y); break;
+    case 'alien':    spawnAlien(x, y); break;
+    case 'tank':     body = spawnTank(x, y); break;
   }
   if (body) World.add(engine.world, body);
 }
@@ -1400,6 +1430,9 @@ function onToolClick(t) {
     if (t.action === 'harpoon') harpoonVolley();
     if (t.action === 'whirlpool') spawnWhirlpool();
     if (t.action === 'kraken') summonKraken();
+    if (t.action === 'meteors') meteorShower();
+    if (t.action === 'storm') spawnDustStorm();
+    if (t.action === 'ufo') summonUFO();
     log(`Action: ${t.label}`);
     return;
   }
@@ -1563,16 +1596,19 @@ const lbar1El = document.getElementById('lbar1');
 const lbar2El = document.getElementById('lbar2');
 const lbar3El = document.getElementById('lbar3');
 const lbar4El = document.getElementById('lbar4');
+const lbar5El = document.getElementById('lbar5');
 const lcount1El = document.getElementById('lcount1');
 const lcount2El = document.getElementById('lcount2');
 const lcount3El = document.getElementById('lcount3');
 const lcount4El = document.getElementById('lcount4');
+const lcount5El = document.getElementById('lcount5');
 
 const GRADE_DATA = {
   1: { grade: 'Grade 6', topic: 'One-Step Equations (+/−)', standard: 'AL CCRS 6.EE.B.7' },
   2: { grade: 'Grade 6', topic: 'One-Step Equations (×/÷)', standard: 'AL CCRS 6.EE.B.7' },
   3: { grade: 'Grade 7', topic: 'Two-Step Equations',        standard: 'AL CCRS 7.EE.B.4' },
   4: { grade: 'Grade 8', topic: 'Variables on Both Sides',   standard: 'AL CCRS 8.EE.C.7' },
+  5: { grade: 'Grade 8', topic: 'Distributive Equations',    standard: 'AL CCRS 8.EE.C.7b' },
 };
 const PROFICIENCY_AT = 3; // correct answers to establish proficiency at a level
 
@@ -1583,13 +1619,15 @@ function refreshProficiency() {
   lbar2El.style.width = pct(2) + '%';
   lbar3El.style.width = pct(3) + '%';
   lbar4El.style.width = pct(4) + '%';
+  lbar5El.style.width = pct(5) + '%';
   lcount1El.textContent = lc[1];
   lcount2El.textContent = lc[2];
   lcount3El.textContent = lc[3];
   lcount4El.textContent = lc[4];
+  lcount5El.textContent = lc[5];
 
   let highestProficient = 0;
-  for (let lvl = 4; lvl >= 1; lvl--) {
+  for (let lvl = 5; lvl >= 1; lvl--) {
     if (lc[lvl] >= PROFICIENCY_AT) { highestProficient = lvl; break; }
   }
 
@@ -1598,7 +1636,7 @@ function refreshProficiency() {
     gradeEl.textContent = `${grade} · ${topic}`;
     standardEl.textContent = standard;
   } else {
-    const active = lc[4] > 0 ? 4 : lc[3] > 0 ? 3 : lc[2] > 0 ? 2 : lc[1] > 0 ? 1 : 0;
+    const active = lc[5] > 0 ? 5 : lc[4] > 0 ? 4 : lc[3] > 0 ? 3 : lc[2] > 0 ? 2 : lc[1] > 0 ? 1 : 0;
     if (active > 0) {
       gradeEl.textContent = `${GRADE_DATA[active].grade} · In Progress`;
       standardEl.textContent = GRADE_DATA[active].standard;
@@ -2072,6 +2110,10 @@ function clearStage() {
   krakens.length = 0;
   charges.length = 0;
   bubbles.length = 0;
+  ufos.length = 0;
+  marsStorms.length = 0;
+  tanks.length = 0;
+  gasPuffs.length = 0;
   decals.length = 0;
   droplets.length = 0;
   frozenIds.clear();
@@ -2088,7 +2130,7 @@ function switchWorld(id) {
   clearStage();
   render.options.background = w.bg;
   rebuildWalls();
-  engine.gravity.y = 1;
+  engine.gravity.y = w.gravity ?? 1;
   const tool = TOOLS.find(t => t.id === state.tool);
   if (!tool || (tool.world !== 'both' && tool.world !== id)) state.tool = 'spawn-box';
   renderToolbar();
@@ -2098,6 +2140,10 @@ function switchWorld(id) {
     World.add(engine.world, spawnCrate(W * 0.35, H - 140));
     spawnDiver(W * 0.62, H - 160);
     log('Descending into The Abyss.', 'solve');
+  } else if (id === 'mars') {
+    World.add(engine.world, spawnCrate(W * 0.35, H - 140));
+    spawnAstro(W * 0.62, H - 160);
+    log('Touchdown on Mars.', 'solve');
   } else {
     for (let i = 0; i < 3; i++) World.add(engine.world, spawnCrate(W * 0.3 + i * 60, H - 100));
     spawnDummy(W * 0.7, H - 140);
@@ -3228,6 +3274,649 @@ Events.on(render, 'afterRender', () => {
   }
 });
 
+// ====================================================================
+// ---------- WORLD 3: MARS ----------
+// 0.38g, rust skies, and everything that wants an astronaut dead:
+// suit breaches, grey aliens with telekinesis, UFO abductions,
+// meteor showers, dust storms, and rocketing oxygen tanks.
+// ====================================================================
+
+const ufos = [];
+const marsStorms = [];
+const tanks = [];
+const gasPuffs = []; // venting air / thruster exhaust { x, y, vx, vy, r, life }
+
+function spawnGas(x, y, vx, vy, r) {
+  gasPuffs.push({ x, y, vx, vy, r, life: rand(20, 45) });
+  if (gasPuffs.length > 200) gasPuffs.shift();
+}
+
+// ---------- Astronaut ----------
+// Mars's resident victim. Same skeleton as the dummy, white EVA suit,
+// glass dome helmet. Damage punctures the suit: air vents, and 8 seconds
+// later they quietly asphyxiate — no gore, just a slow collapse.
+
+const SUIT_BREACH_AT = 10;   // total damage that punctures the suit
+const SUFFOCATE_MS = 8000;
+
+function spawnAstro(x, y) {
+  const id = nextDummyId++;
+  const group = Body.nextGroup(true);
+  const tag = (b, part) => { b.label = 'flesh'; b.dummyId = id; b.bodyPart = part; return b; };
+
+  const suit = '#d8dde2', suitDark = '#aab4bc';
+  const head = tag(Bodies.circle(x, y - 60, 15, { collisionFilter: { group }, render: { fillStyle: '#e8ecf0' } }), 'head');
+  const torso = tag(Bodies.rectangle(x, y - 20, 26, 60, { collisionFilter: { group }, render: { fillStyle: suit } }), 'back');
+  const armL = tag(Bodies.rectangle(x - 22, y - 20, 14, 50, { collisionFilter: { group }, render: { fillStyle: suit } }), 'armL');
+  const armR = tag(Bodies.rectangle(x + 22, y - 20, 14, 50, { collisionFilter: { group }, render: { fillStyle: suit } }), 'armR');
+  const legL = tag(Bodies.rectangle(x - 8, y + 30, 14, 50, { collisionFilter: { group }, render: { fillStyle: suitDark } }), 'legL');
+  const legR = tag(Bodies.rectangle(x + 8, y + 30, 14, 50, { collisionFilter: { group }, render: { fillStyle: suitDark } }), 'legR');
+
+  const parts = [head, torso, armL, armR, legL, legR];
+  const joinOpts = { stiffness: 0.9, damping: 0.3, length: 0, render: { visible: false } };
+  const joints = {
+    neck:      Constraint.create({ bodyA: head, bodyB: torso, pointA: { x: -6, y: 12 }, pointB: { x: -6, y: -28 }, ...joinOpts }),
+    neck2:     Constraint.create({ bodyA: head, bodyB: torso, pointA: { x: 6,  y: 12 }, pointB: { x: 6,  y: -28 }, ...joinOpts }),
+    shoulderL: Constraint.create({ bodyA: torso, bodyB: armL, pointA: { x: -10, y: -22 }, pointB: { x: 0, y: -20 }, ...joinOpts }),
+    shoulderR: Constraint.create({ bodyA: torso, bodyB: armR, pointA: { x: 10, y: -22 }, pointB: { x: 0, y: -20 }, ...joinOpts }),
+    hipL:      Constraint.create({ bodyA: torso, bodyB: legL, pointA: { x: -7, y: 28 }, pointB: { x: 0, y: -20 }, ...joinOpts }),
+    hipR:      Constraint.create({ bodyA: torso, bodyB: legR, pointA: { x: 7, y: 28 }, pointB: { x: 0, y: -20 }, ...joinOpts }),
+  };
+  const constraints = Object.values(joints);
+
+  dummies.set(id, {
+    kind: 'human',
+    isAstro: true,
+    suitBreachedAt: 0,
+    parts, constraints, joints,
+    limbs: { head, torso, armL, armR, legL, legR },
+    damage: 0,
+    partDamage: { back: 0, legL: 0, legR: 0, neck: 0, armL: 0, armR: 0 },
+    legsOk: { L: true, R: true },
+    backOk: true,
+    standing: true,
+    dead: false,
+  });
+  World.add(engine.world, [...parts, ...constraints]);
+  return null;
+}
+
+// Suit breach + suffocation
+Events.on(engine, 'beforeUpdate', () => {
+  const now = performance.now();
+  for (const d of dummies.values()) {
+    if (!d.isAstro || d.dead) continue;
+    if (!d.suitBreachedAt && d.damage > SUIT_BREACH_AT) {
+      d.suitBreachedAt = now;
+      log('Suit breach — oxygen venting.', 'hint');
+    }
+    if (d.suitBreachedAt) {
+      // Air hisses out of the torso
+      if (Math.random() < 0.45) {
+        const t = d.limbs.torso;
+        spawnGas(t.position.x + rand(-8, 8), t.position.y + rand(-20, 10), rand(-0.6, 0.6), rand(-1.4, -0.5), rand(2, 4));
+      }
+      if (now - d.suitBreachedAt > SUFFOCATE_MS) {
+        d.dead = true;
+        d.standing = false;
+        for (const p of d.parts) p.render.fillStyle = '#7a8694'; // gone grey
+        log('Asphyxiated.', 'solve');
+      }
+    }
+  }
+});
+
+// Astronaut helmet + breach light
+Events.on(render, 'afterRender', () => {
+  const ctx = render.context;
+  const now = performance.now();
+  for (const d of dummies.values()) {
+    if (!d.isAstro) continue;
+    const head = d.limbs.head;
+    if (!head) continue;
+    const { x, y } = head.position;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(head.angle);
+    // Glass dome
+    ctx.beginPath();
+    ctx.arc(0, 0, 17, 0, Math.PI * 2);
+    ctx.fillStyle = d.dead ? 'rgba(150,160,175,0.25)' : 'rgba(160,200,235,0.18)';
+    ctx.fill();
+    ctx.strokeStyle = d.dead ? '#7a8694' : '#f0f4f8';
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+    // Fogged interior once dead
+    if (d.dead && d.isAstro && d.suitBreachedAt) {
+      ctx.beginPath();
+      ctx.arc(0, 0, 14, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(220,228,235,0.5)';
+      ctx.fill();
+    }
+    // Glint
+    ctx.beginPath();
+    ctx.arc(-5, -5, 3, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255,255,255,0.55)';
+    ctx.fill();
+    ctx.restore();
+    // Blinking red breach warning above the helmet
+    if (d.suitBreachedAt && !d.dead && Math.sin(now / 120) > 0) {
+      const grad = ctx.createRadialGradient(x, y - 26, 0, x, y - 26, 7);
+      grad.addColorStop(0, 'rgba(255,60,40,0.95)');
+      grad.addColorStop(1, 'rgba(255,60,40,0)');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(x, y - 26, 7, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+});
+
+// ---------- Grey Alien ----------
+// Small ragdoll with a big head. Walks toward the nearest victim and,
+// in range, telekinetically lifts them for a second — then hurls them.
+
+function spawnAlien(x, y) {
+  const id = nextDummyId++;
+  const group = Body.nextGroup(true);
+  const tag = (b, part) => { b.label = 'flesh'; b.dummyId = id; b.bodyPart = part; return b; };
+
+  const skin = '#8a9498', skinDark = '#5e686c';
+  const head = tag(Bodies.circle(x, y - 44, 15, { collisionFilter: { group }, render: { fillStyle: skin } }), 'head');
+  const torso = tag(Bodies.rectangle(x, y - 12, 16, 36, { collisionFilter: { group }, render: { fillStyle: skin } }), 'back');
+  const legL = tag(Bodies.rectangle(x - 5, y + 20, 8, 28, { collisionFilter: { group }, render: { fillStyle: skinDark } }), 'legL');
+  const legR = tag(Bodies.rectangle(x + 5, y + 20, 8, 28, { collisionFilter: { group }, render: { fillStyle: skinDark } }), 'legR');
+
+  const parts = [head, torso, legL, legR];
+  const joinOpts = { stiffness: 0.92, damping: 0.35, length: 0, render: { visible: false } };
+  const joints = {
+    neck:  Constraint.create({ bodyA: head, bodyB: torso, pointA: { x: -5, y: 12 }, pointB: { x: -5, y: -16 }, ...joinOpts }),
+    neck2: Constraint.create({ bodyA: head, bodyB: torso, pointA: { x: 5, y: 12 }, pointB: { x: 5, y: -16 }, ...joinOpts }),
+    hipL:  Constraint.create({ bodyA: torso, bodyB: legL, pointA: { x: -4, y: 16 }, pointB: { x: 0, y: -12 }, ...joinOpts }),
+    hipR:  Constraint.create({ bodyA: torso, bodyB: legR, pointA: { x: 4, y: 16 }, pointB: { x: 0, y: -12 }, ...joinOpts }),
+  };
+  const constraints = Object.values(joints);
+
+  dummies.set(id, {
+    kind: 'alien',
+    parts, constraints, joints,
+    limbs: { head, torso, legL, legR },
+    damage: 0,
+    partDamage: { back: 0, legL: 0, legR: 0, neck: 0, head: 0 },
+    legsOk: { L: true, R: true },
+    backOk: true,
+    standing: true,
+    dead: false,
+    tkReadyAt: 0,
+    tkTarget: null,
+    tkUntil: 0,
+  });
+  World.add(engine.world, [...parts, ...constraints]);
+  return null;
+}
+
+// Alien AI: approach, then telekinetic lift + hurl
+Events.on(engine, 'beforeUpdate', () => {
+  const now = performance.now();
+  for (const al of dummies.values()) {
+    if (al.kind !== 'alien' || al.dead) continue;
+    if (al.paralyzedUntil && now < al.paralyzedUntil) continue;
+    const torso = al.limbs.torso;
+
+    // Active lift: hold the victim aloft, then hurl at the end
+    if (al.tkTarget) {
+      const t = al.tkTarget;
+      if (t.dead || now > al.tkUntil) {
+        if (!t.dead) {
+          const dir = Math.sign(t.limbs.torso.position.x - torso.position.x) || 1;
+          Body.setVelocity(t.limbs.torso, { x: dir * rand(14, 22), y: -rand(6, 12) });
+          log('Hurled.', 'hint');
+        }
+        al.tkTarget = null;
+        al.tkReadyAt = now + rand(2800, 4200);
+        continue;
+      }
+      const tt = t.limbs.torso;
+      const hoverY = torso.position.y - 90;
+      Body.applyForce(tt, tt.position, {
+        x: (torso.position.x - tt.position.x) * 0.00002 * tt.mass,
+        y: (-engine.gravity.y * 0.0012 + (hoverY - tt.position.y) * 0.00004) * tt.mass,
+      });
+      continue;
+    }
+
+    if (!al.standing) continue;
+    const targets = [...dummies.values()].filter(d =>
+      (d.kind === 'human' || d.kind === 'duck' || d.kind === 'monster') && !d.dead);
+    if (targets.length === 0) continue;
+
+    let nearest = null, bestD = Infinity;
+    for (const t of targets) {
+      const tt = t.limbs.torso;
+      const dd = Math.hypot(tt.position.x - torso.position.x, tt.position.y - torso.position.y);
+      if (dd < bestD) { bestD = dd; nearest = t; }
+    }
+    if (!nearest) continue;
+
+    const dx = nearest.limbs.torso.position.x - torso.position.x;
+    if (bestD > 170) {
+      Body.applyForce(torso, torso.position, { x: Math.sign(dx) * 0.006 * torso.mass, y: 0 });
+    } else if (now > al.tkReadyAt) {
+      al.tkTarget = nearest;
+      al.tkUntil = now + 1100;
+      log('Telekinetic grip.', 'hint');
+    }
+  }
+});
+
+// Alien render: big black almond eyes + telekinesis aura
+Events.on(render, 'afterRender', () => {
+  const ctx = render.context;
+  const now = performance.now();
+  for (const al of dummies.values()) {
+    if (al.kind !== 'alien') continue;
+    const head = al.limbs.head;
+    if (!head) continue;
+    const a = head.angle;
+    ctx.save();
+    ctx.translate(head.position.x, head.position.y);
+    ctx.rotate(a);
+    // Cranium bulge
+    ctx.fillStyle = al.dead ? '#666e70' : '#8a9498';
+    ctx.beginPath();
+    ctx.ellipse(0, -4, 14, 11, 0, Math.PI, 0);
+    ctx.fill();
+    // Almond eyes
+    ctx.fillStyle = '#0a0c0e';
+    for (const s of [-1, 1]) {
+      ctx.beginPath();
+      ctx.ellipse(s * 7, 0, 5.5, 3, s * 0.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    if (!al.dead) {
+      ctx.fillStyle = 'rgba(190,210,230,0.7)';
+      for (const s of [-1, 1]) {
+        ctx.beginPath();
+        ctx.arc(s * 6, -1, 1, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    ctx.restore();
+
+    // Telekinesis aura: pulsing rings around alien head + victim
+    if (al.tkTarget && !al.dead) {
+      const t = al.tkTarget.limbs.torso;
+      for (const [px, py] of [[head.position.x, head.position.y], [t.position.x, t.position.y]]) {
+        for (let k = 0; k < 2; k++) {
+          const ph = ((now / 500 + k * 0.5) % 1);
+          ctx.beginPath();
+          ctx.arc(px, py, 12 + ph * 26, 0, Math.PI * 2);
+          ctx.strokeStyle = `rgba(190,120,255,${0.55 * (1 - ph)})`;
+          ctx.lineWidth = 2;
+          ctx.stroke();
+        }
+      }
+      ctx.strokeStyle = 'rgba(190,120,255,0.25)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(head.position.x, head.position.y);
+      ctx.lineTo(t.position.x, t.position.y);
+      ctx.stroke();
+    }
+  }
+});
+
+// ---------- Oxygen Tank ----------
+// Pressurized canister. Puncture it (hard hit or bullet) and it becomes an
+// unguided rocket for 2.5 seconds, then explodes.
+
+function spawnTank(x, y) {
+  const t = Bodies.rectangle(x, y, 20, 44, {
+    density: 0.008, friction: 0.4,
+    render: { fillStyle: '#e8ecf0', strokeStyle: '#8a949c', lineWidth: 2 },
+    label: 'tank',
+  });
+  t.tankData = { punctured: 0, thrustUntil: 0 };
+  tanks.push(t);
+  return t;
+}
+
+// Puncture on hard impact
+Events.on(engine, 'collisionStart', (e) => {
+  const now = performance.now();
+  for (const pair of e.pairs) {
+    for (const [t, other] of [[pair.bodyA, pair.bodyB], [pair.bodyB, pair.bodyA]]) {
+      if (t.label !== 'tank' || !t.tankData || t.tankData.punctured) continue;
+      const speed = Math.hypot(t.velocity.x - other.velocity.x, t.velocity.y - other.velocity.y);
+      if (speed > 8 || other.label === 'bullet' || other.label === 'meteor') {
+        t.tankData.punctured = now;
+        t.tankData.thrustUntil = now + 2500;
+        log('Tank punctured — thrust unstable.', 'hint');
+      }
+    }
+  }
+});
+
+// Tank thrust + detonation
+Events.on(engine, 'beforeUpdate', () => {
+  if (tanks.length === 0) return;
+  const now = performance.now();
+  const worldBodies = Composite.allBodies(engine.world);
+  for (let i = tanks.length - 1; i >= 0; i--) {
+    const t = tanks[i];
+    if (!worldBodies.includes(t)) { tanks.splice(i, 1); continue; }
+    if (!t.tankData.punctured) continue;
+    if (now < t.tankData.thrustUntil) {
+      // Thrust out of the nozzle (top of the canister, along its axis)
+      const ax = Math.sin(t.angle), ay = -Math.cos(t.angle);
+      Body.applyForce(t, t.position, { x: ax * 0.012 * t.mass, y: ay * 0.012 * t.mass });
+      Body.setAngularVelocity(t, t.angularVelocity + rand(-0.04, 0.04));
+      const nx = t.position.x - ax * 24, ny = t.position.y - ay * 24;
+      spawnGas(nx, ny, -ax * 2 + rand(-0.5, 0.5), -ay * 2 + rand(-0.5, 0.5), rand(2.5, 4.5));
+    } else {
+      boom(t.position.x, t.position.y, 170, 0.15);
+      flash(t.position.x, t.position.y);
+      Composite.remove(engine.world, t);
+      tanks.splice(i, 1);
+    }
+  }
+});
+
+// ---------- Meteor Shower ----------
+// 3 seconds of flaming rocks streaking in from the top. Each explodes on
+// first contact, leaving a scorch mark.
+
+function meteorShower() {
+  const duration = 3000, interval = 300;
+  const start = performance.now();
+  log('Meteor shower incoming.', 'hint');
+  const drop = () => {
+    if (state.world !== 'mars') return;
+    if (performance.now() - start > duration) return;
+    const m = Bodies.circle(rand(W * 0.05, W * 0.95), -30, rand(9, 15), {
+      density: 0.04,
+      render: { fillStyle: '#6a4a3a', strokeStyle: '#3a2418', lineWidth: 2 },
+      label: 'meteor',
+    });
+    Body.setVelocity(m, { x: rand(-6, 6), y: rand(13, 19) });
+    World.add(engine.world, m);
+    setTimeout(() => {
+      if (Composite.allBodies(engine.world).includes(m)) Composite.remove(engine.world, m);
+    }, 6000);
+    setTimeout(drop, interval);
+  };
+  drop();
+}
+
+// Meteors explode on first contact
+Events.on(engine, 'collisionStart', (e) => {
+  for (const pair of e.pairs) {
+    for (const m of [pair.bodyA, pair.bodyB]) {
+      if (m.label !== 'meteor') continue;
+      const mx = m.position.x, my = m.position.y;
+      boom(mx, my, 130, 0.11);
+      flash(mx, my);
+      // Scorch mark
+      for (let k = 0; k < 4; k++) {
+        decals.push({ x: mx + rand(-12, 12), y: my + rand(-6, 10), r: rand(5, 12), color: '#2a1a10', alpha: 0.6 });
+      }
+      Composite.remove(engine.world, m);
+    }
+  }
+});
+
+// Meteor fire trails
+Events.on(render, 'afterRender', () => {
+  const ctx = render.context;
+  for (const m of Composite.allBodies(engine.world)) {
+    if (m.label !== 'meteor') continue;
+    const v = Math.hypot(m.velocity.x, m.velocity.y);
+    if (v < 2) continue;
+    const tx = m.position.x - (m.velocity.x / v) * 55;
+    const ty = m.position.y - (m.velocity.y / v) * 55;
+    const grad = ctx.createLinearGradient(m.position.x, m.position.y, tx, ty);
+    grad.addColorStop(0, 'rgba(255,180,60,0.8)');
+    grad.addColorStop(0.5, 'rgba(230,90,30,0.35)');
+    grad.addColorStop(1, 'rgba(200,60,20,0)');
+    ctx.strokeStyle = grad;
+    ctx.lineWidth = m.circleRadius * 1.6;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(m.position.x, m.position.y);
+    ctx.lineTo(tx, ty);
+    ctx.stroke();
+  }
+});
+
+// ---------- Dust Storm ----------
+// Screen-wide lateral wind for 6 seconds. Knocks ragdolls over, carries
+// crates, and drops visibility behind a rust haze.
+
+function spawnDustStorm() {
+  marsStorms.push({
+    born: performance.now(),
+    life: 6000,
+    dir: Math.random() < 0.5 ? 1 : -1,
+    streaks: Array.from({ length: 70 }, () => ({
+      x: Math.random() * 1.2 - 0.1, y: Math.random(),
+      len: rand(20, 70), speed: rand(0.012, 0.03),
+    })),
+  });
+  log('Dust storm rolling in.', 'hint');
+}
+
+Events.on(engine, 'beforeUpdate', () => {
+  if (marsStorms.length === 0) return;
+  const now = performance.now();
+  for (let i = marsStorms.length - 1; i >= 0; i--) {
+    const s = marsStorms[i];
+    const age = (now - s.born) / s.life;
+    if (age > 1) { marsStorms.splice(i, 1); continue; }
+    const ramp = Math.min(1, age * 4) * Math.min(1, (1 - age) * 4); // ease in/out
+    for (const body of Composite.allBodies(engine.world)) {
+      if (body.isStatic || frozenIds.has(body.id)) continue;
+      Body.applyForce(body, body.position, {
+        x: s.dir * 0.0022 * body.mass * ramp,
+        y: Math.sin(now / 180 + body.id) * 0.0006 * body.mass * ramp,
+      });
+    }
+  }
+});
+
+Events.on(render, 'afterRender', () => {
+  if (marsStorms.length === 0) return;
+  const ctx = render.context;
+  const now = performance.now();
+  for (const s of marsStorms) {
+    const age = (now - s.born) / s.life;
+    const ramp = Math.min(1, age * 4) * Math.min(1, (1 - age) * 4);
+    // Haze
+    ctx.fillStyle = `rgba(160,80,40,${0.16 * ramp})`;
+    ctx.fillRect(0, 0, W, H);
+    // Wind streaks
+    ctx.strokeStyle = `rgba(220,150,100,${0.35 * ramp})`;
+    ctx.lineWidth = 1.5;
+    for (const st of s.streaks) {
+      st.x += s.dir * st.speed;
+      if (s.dir > 0 && st.x > 1.1) st.x = -0.1;
+      if (s.dir < 0 && st.x < -0.1) st.x = 1.1;
+      const sx = st.x * W, sy = st.y * H;
+      ctx.beginPath();
+      ctx.moveTo(sx, sy);
+      ctx.lineTo(sx - s.dir * st.len, sy + Math.sin(now / 300 + st.y * 9) * 4);
+      ctx.stroke();
+    }
+  }
+});
+
+// ---------- UFO Abduction ----------
+// A saucer sweeps across the sky with a tractor beam. Anything caught in
+// the cone floats upward; anything that reaches the hull is taken.
+
+function summonUFO() {
+  const dir = Math.random() < 0.5 ? 1 : -1;
+  ufos.push({
+    x: dir > 0 ? -80 : W + 80,
+    y: H * 0.13,
+    dir,
+    born: performance.now(),
+    life: 9500,
+    taken: 0,
+  });
+  log('They’re here.', 'hint');
+}
+
+Events.on(engine, 'beforeUpdate', () => {
+  if (ufos.length === 0) return;
+  const now = performance.now();
+  for (let i = ufos.length - 1; i >= 0; i--) {
+    const u = ufos[i];
+    const age = now - u.born;
+    if (age > u.life || u.x < -120 || u.x > W + 120) {
+      if (age > 600) { ufos.splice(i, 1); continue; }
+    }
+    // Sweep, slowing over the middle of the stage
+    const mid = Math.abs(u.x - W / 2) / (W / 2);
+    u.x += u.dir * (0.6 + 1.8 * mid);
+
+    // Tractor beam: cone from the saucer down to the floor
+    const beamHalfTop = 26, beamHalfBot = 95;
+    for (const body of Composite.allBodies(engine.world)) {
+      if (body.isStatic || frozenIds.has(body.id)) continue;
+      if (body.position.y < u.y) continue;
+      const fr = (body.position.y - u.y) / (H - u.y);
+      const half = beamHalfTop + (beamHalfBot - beamHalfTop) * fr;
+      if (Math.abs(body.position.x - u.x) > half) continue;
+      // Lift + center
+      Body.applyForce(body, body.position, {
+        x: (u.x - body.position.x) * 0.00003 * body.mass,
+        y: -engine.gravity.y * 0.0013 * body.mass,
+      });
+      // Taken
+      if (body.position.y < u.y + 40) {
+        if (body.label === 'flesh') {
+          const d = dummies.get(body.dummyId);
+          if (d && !d.dead) {
+            d.dead = true;
+            for (const c of d.constraints) Composite.remove(engine.world, c);
+            d.constraints = [];
+            log('Abducted.', 'solve');
+          }
+        }
+        Composite.remove(engine.world, body);
+        u.taken += 1;
+      }
+    }
+  }
+});
+
+Events.on(render, 'afterRender', () => {
+  if (ufos.length === 0) return;
+  const ctx = render.context;
+  const now = performance.now();
+  for (const u of ufos) {
+    // Beam
+    const flicker = 0.75 + 0.25 * Math.sin(now / 90);
+    const beam = ctx.createLinearGradient(u.x, u.y, u.x, H);
+    beam.addColorStop(0, `rgba(120,255,160,${0.28 * flicker})`);
+    beam.addColorStop(1, 'rgba(120,255,160,0.03)');
+    ctx.fillStyle = beam;
+    ctx.beginPath();
+    ctx.moveTo(u.x - 26, u.y + 10);
+    ctx.lineTo(u.x + 26, u.y + 10);
+    ctx.lineTo(u.x + 95, H);
+    ctx.lineTo(u.x - 95, H);
+    ctx.closePath();
+    ctx.fill();
+
+    // Saucer
+    ctx.save();
+    ctx.translate(u.x, u.y);
+    // Hull
+    ctx.fillStyle = '#9aa6b2';
+    ctx.strokeStyle = '#4a545e';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 55, 14, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    // Dome
+    ctx.fillStyle = 'rgba(150,220,190,0.55)';
+    ctx.beginPath();
+    ctx.ellipse(0, -10, 22, 14, 0, Math.PI, 0);
+    ctx.fill();
+    // Running lights
+    for (let k = 0; k < 5; k++) {
+      const lx = -40 + k * 20;
+      const on = Math.floor(now / 200 + k) % 5 === 0;
+      ctx.beginPath();
+      ctx.arc(lx, 5, 3, 0, Math.PI * 2);
+      ctx.fillStyle = on ? '#aef2c0' : '#3a4a44';
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+});
+
+// ---------- Mars ambience: butterscotch sky, twin moons, drifting dust ----------
+
+const marsDust = Array.from({ length: 36 }, () => ({
+  x: Math.random(), y: Math.random(), r: rand(0.5, 1.6), v: rand(0.00008, 0.00028),
+}));
+
+Events.on(render, 'afterRender', () => {
+  if (state.world !== 'mars') return;
+  const ctx = render.context;
+  const now = performance.now();
+
+  // Horizon glow
+  const sky = ctx.createLinearGradient(0, 0, 0, H);
+  sky.addColorStop(0, 'rgba(0,0,0,0)');
+  sky.addColorStop(0.75, 'rgba(190,100,50,0.05)');
+  sky.addColorStop(1, 'rgba(210,120,60,0.13)');
+  ctx.fillStyle = sky;
+  ctx.fillRect(0, 0, W, H);
+
+  // Phobos + Deimos, creeping across the sky
+  const moons = [
+    { fr: (now / 240000) % 1.2 - 0.1, y: H * 0.12, r: 9, c: '#b8aa9a' },
+    { fr: (now / 410000 + 0.45) % 1.2 - 0.1, y: H * 0.2, r: 5, c: '#9a8e80' },
+  ];
+  for (const m of moons) {
+    ctx.beginPath();
+    ctx.arc(m.fr * W, m.y, m.r, 0, Math.PI * 2);
+    ctx.fillStyle = m.c;
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(m.fr * W - m.r * 0.3, m.y + m.r * 0.2, m.r * 0.3, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(0,0,0,0.25)';
+    ctx.fill();
+  }
+
+  // Drifting dust motes
+  ctx.fillStyle = 'rgba(220,160,110,0.18)';
+  for (const m of marsDust) {
+    m.x += m.v;
+    if (m.x > 1) m.x = 0;
+    ctx.beginPath();
+    ctx.arc(m.x * W, m.y * H, m.r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Gas puffs (suit breaches + tank thrust) — white, expanding, fading
+  for (let i = gasPuffs.length - 1; i >= 0; i--) {
+    const g = gasPuffs[i];
+    g.x += g.vx; g.y += g.vy;
+    g.r += 0.12;
+    g.life -= 1;
+    if (g.life <= 0) { gasPuffs.splice(i, 1); continue; }
+    ctx.beginPath();
+    ctx.arc(g.x, g.y, g.r, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(235,242,248,${Math.min(0.5, g.life / 60)})`;
+    ctx.fill();
+  }
+});
+
 // ---------- Mobile: tool-drawer toggle ----------
 // Hiding the drawer changes the stage size, so rebuild walls after reflow.
 
@@ -3236,6 +3925,6 @@ document.getElementById('panel-toggle').addEventListener('click', () => {
   requestAnimationFrame(() => rebuildWalls());
 });
 
-// ---------- World 2 boot ----------
+// ---------- World 2 + 3 boot ----------
 
 renderWorldTabs();
